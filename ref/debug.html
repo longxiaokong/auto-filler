@@ -188,6 +188,12 @@
       cursor: pointer;
     }
     .card-header .badge:hover { text-decoration: underline; }
+    .card-header .text-hint {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-left: 12px;
+    }
 
     /* table form */
     .form-table { width: 100%; border-collapse: collapse; }
@@ -228,6 +234,30 @@
       box-shadow: 0 0 0 3px rgba(79,110,247,.12);
     }
     input[readonly] { background: #f8fafc; color: var(--text-secondary); }
+    textarea {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+      width: 100%;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.8;
+    }
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79,110,247,.12);
+    }
+    .textarea-count {
+      text-align: right;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
     .input-w4 { max-width: 320px; }
     .input-w6 { max-width: 480px; }
     .input-group {
@@ -570,10 +600,28 @@
     </table>
   </div>
 
+  <!-- 个人陈述 -->
+  <div class="card">
+    <div class="card-header">
+      个人陈述
+      <span class="text-hint">请简要介绍个人学术背景、研究兴趣及未来规划</span>
+    </div>
+    <textarea id="personalStatement" rows="12" placeholder="请在此输入个人陈述（建议 800-1500 字）……"></textarea>
+    <div class="textarea-count"><span id="charCount">0</span> 字</div>
+  </div>
+
   <div class="btn-row">
     <button class="btn btn-primary" onclick="alert('模拟保存并进入下一步')">下一步</button>
   </div>
 </div>
+
+<script>
+const ta = document.getElementById('personalStatement');
+const cc = document.getElementById('charCount');
+ta.addEventListener('input', () => {
+  cc.textContent = ta.value.replace(/\s/g, '').length;
+});
+</script>
 
 <div class="footer">
   报考服务系统 &copy; 2026

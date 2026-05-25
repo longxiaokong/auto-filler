@@ -1,6 +1,6 @@
 import './style.css';
 import { isApiConfigured } from '@/utils/storage';
-import { hasTextFields } from '@/utils/db';
+import { getAllFileRecords, hasTextFields } from '@/utils/db';
 import type { MatchResult, FormFieldInfo } from '@/utils/matcher';
 
 const app = document.getElementById('app')!;
@@ -30,12 +30,15 @@ type ViewState = 'idle' | 'scanning' | 'result' | 'filling' | 'filled';
 type Confidence = MatchResult['confidence'];
 
 interface DisplayItem {
+  kind: 'text' | 'file';
   index: number;
   label: string;
   value: string;
   status: 'matched' | 'pending' | 'unmatched';
   confidence?: Confidence;
+  fillMode?: 'short' | 'long';
   checked: boolean;
+  match?: MatchResult;
 }
 
 // State
@@ -44,15 +47,21 @@ let displayItems: DisplayItem[] = [];
 let fields: FormFieldInfo[] = [];
 
 async function init() {
-  const [hasFields, apiReady] = await Promise.all([
+  const [hasFields, apiReady, fileRecords] = await Promise.all([
     hasTextFields(),
     isApiConfigured(),
+    getAllFileRecords(),
   ]);
 
   renderHeader();
 
-  if (!hasFields || !apiReady) {
+  const hasMaterials = fileRecords.length > 0;
+  if (!hasFields && !hasMaterials) {
     renderNotConfigured(!hasFields);
+    return;
+  }
+  if (!apiReady && !hasMaterials) {
+    renderNotConfigured(false);
     return;
   }
 
@@ -141,23 +150,30 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
     matchedSet.set(m.index, m);
   }
 
+  const fieldByIndex = new Map(scanResp.fields.map((f) => [f.index, f]));
   const items: DisplayItem[] = [];
 
   for (const m of scanResp.matches) {
-    const confidence = normalizeConfidence(m.confidence);
+    const field = fieldByIndex.get(m.index);
+    const fillMode = m.fillMode ?? field?.fillMode;
+    const isLong = fillMode === 'long';
     items.push({
+      kind: m.kind ?? 'text',
       index: m.index,
       label: shortenLabel(m.shortLabel || m.fieldKey || `字段 #${m.index}`),
       value: m.value,
-      status: confidence === 'high' ? 'matched' : 'pending',
-      confidence,
-      checked: confidence !== 'low',
+      status: isLong ? 'matched' : (m.confidence === 'high' ? 'matched' : 'pending'),
+      confidence: isLong ? undefined : m.confidence,
+      fillMode,
+      checked: isLong ? true : (m.confidence !== 'low'),
+      match: m,
     });
   }
 
   for (const f of scanResp.fields) {
     if (!matchedSet.has(f.index)) {
       items.push({
+        kind: f.kind ?? 'text',
         index: f.index,
         label: getFieldLabel(f, f.index),
         value: '-',
@@ -235,7 +251,7 @@ function renderResult(scanResp: ScanResponse) {
   const list = document.getElementById('fieldList')!;
   for (const item of displayItems) {
     const li = document.createElement('li');
-    li.className = `field-item ${item.confidence ? `confidence-${item.confidence}` : ''}`.trim();
+    li.className = `field-item ${item.kind === 'file' ? 'file-item' : ''} ${item.fillMode === 'long' ? 'long-text-item' : ''} ${item.confidence ? `confidence-${item.confidence}` : ''}`.trim();
 
     const checkboxHtml = item.status !== 'unmatched'
       ? `<input type="checkbox" data-idx="${item.index}" ${item.checked ? 'checked' : ''} />`
@@ -267,6 +283,10 @@ function renderResult(scanResp: ScanResponse) {
 function getStatusHtml(item: DisplayItem): string {
   if (item.status === 'unmatched') {
     return '<span class="status-tag unmatched">未匹配</span>';
+  }
+
+  if (item.fillMode === 'long') {
+    return '<span class="status-tag long-text">长文本</span>';
   }
 
   const confidence = item.confidence ?? 'medium';
@@ -356,7 +376,8 @@ function showError(message: string) {
 function startFill() {
   const selected = displayItems
     .filter((i) => i.checked && i.status !== 'unmatched')
-    .map((i) => ({ index: i.index, value: i.value }));
+    .map((i) => i.match)
+    .filter((match): match is MatchResult => Boolean(match));
 
   if (selected.length === 0) return;
 

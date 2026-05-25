@@ -353,9 +353,18 @@ body {
   color: #DC2626;
 }
 
+.status-tag.long-text {
+  background: #EAF2FF;
+  color: #257FFD;
+}
+
 .status-tag.unmatched {
   background: #F3F4F6;
   color: #9CA3AF;
+}
+
+.field-item.long-text-item {
+  background: #F8FAFE;
 }
 
 /* ===== Footer ===== */
