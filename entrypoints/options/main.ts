@@ -1,5 +1,6 @@
-import { getProfile, setProfile, getApiConfig, setApiConfig, isProfileConfigured, isApiConfigured } from '../../utils/storage';
-import type { ProfileType, ProfileFields } from '../../utils/storage';
+import { getApiConfig, setApiConfig } from '../../utils/storage';
+import { getAllTextFields, saveAllTextFields } from '../../utils/db';
+import type { TextField } from '../../utils/db';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
 const pageContent = document.getElementById('pageContent')!;
@@ -17,8 +18,9 @@ const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
 };
 
 let currentPage = 'profile';
-let profileData: { profileType: ProfileType; fields: ProfileFields } | null = null;
+let textFields: TextField[] = [];
 let apiConfigData: { baseUrl: string; apiKey: string; model: string } | null = null;
+let nextFieldId = 0;
 
 // ===== Navigation =====
 navItems.forEach((item) => {
@@ -60,20 +62,19 @@ function renderPlaceholderPage(title: string) {
 
 // ===== Profile Page =====
 function renderProfilePage() {
-  const fields: ProfileFields = profileData?.fields ?? { name: '', gender: '', idNumber: '', phone: '', email: '', address: '' };
-  const hasData = profileData && isProfileConfiguredSync(fields);
+  const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
 
   const infoFields = [
-    { key: 'name', label: '姓名', icon: '👤' },
-    { key: 'phone', label: '手机号', icon: '📱' },
-    { key: 'email', label: '邮箱', icon: '✉️' },
-    { key: 'school', label: '学校', icon: '🏫' },
-    { key: 'major', label: '专业', icon: '📚' },
-    { key: 'gpa', label: '学分绩', icon: '📊' },
+    { key: 'name', label: '姓名' },
+    { key: 'phone', label: '手机号' },
+    { key: 'email', label: '邮箱' },
+    { key: 'school', label: '学校' },
+    { key: 'major', label: '专业' },
+    { key: 'gpa', label: '学分绩' },
   ];
 
   const infoHtml = infoFields.map((f) => {
-    const val = (fields as unknown as Record<string, string>)[f.key];
+    const val = fieldMap[f.key] ?? '';
     const displayVal = val ? escapeHtml(val) : '<span class="empty">未填写</span>';
     return `
       <div class="profile-field">
@@ -139,6 +140,8 @@ function renderProfilePage() {
     </div>
   `).join('');
 
+  const firstName = fieldMap['name']?.[0] || '用';
+
   pageContent.innerHTML = `
     <div class="profile-grid">
       <div class="profile-left">
@@ -148,7 +151,7 @@ function renderProfilePage() {
             <button class="card-action" id="editProfileBtn">编辑</button>
           </div>
           <div class="profile-info">
-            <div class="profile-avatar">${(fields.name?.[0] || '用')}</div>
+            <div class="profile-avatar">${firstName}</div>
             <div class="profile-fields">${infoHtml}</div>
           </div>
         </div>
@@ -190,133 +193,20 @@ function renderProfilePage() {
   });
 }
 
-function isProfileConfiguredSync(fields: ProfileFields): boolean {
-  return fields.name.length > 0;
-}
-
 // ===== Settings Page =====
-const SETTINGS_FIELD_IDS = [
-  'name', 'gender', 'idNumber', 'phone', 'email', 'address',
-  'school', 'major', 'studentId', 'degree', 'gpa', 'enrollmentYear',
-  'employeeId', 'department', 'position', 'rank',
-] as const;
-
 function renderSettingsPage() {
-  const fields = profileData?.fields ?? {} as ProfileFields;
-  const type = profileData?.profileType ?? 'general';
+  const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
   const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '' };
+
+  nextFieldId = 0;
+  const fieldRowsHtml = textFields.map((f) => createFieldRowHtml(f.key, f.value)).join('');
 
   pageContent.innerHTML = `
     <div class="settings-form">
       <div class="settings-section">
-        <h2>人员类型</h2>
-        <div class="form-group">
-          <label>类型</label>
-          <select id="profileType">
-            <option value="general" ${type === 'general' ? 'selected' : ''}>普通</option>
-            <option value="student" ${type === 'student' ? 'selected' : ''}>学生</option>
-            <option value="civil_servant" ${type === 'civil_servant' ? 'selected' : ''}>公务员</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2>基本信息</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="name">姓名</label>
-            <input type="text" id="name" value="${escapeAttr(fields.name)}" placeholder="请输入姓名" />
-          </div>
-          <div class="form-group">
-            <label for="gender">性别</label>
-            <select id="gender">
-              <option value="">请选择</option>
-              <option value="男" ${fields.gender === '男' ? 'selected' : ''}>男</option>
-              <option value="女" ${fields.gender === '女' ? 'selected' : ''}>女</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="idNumber">身份证号</label>
-            <input type="text" id="idNumber" value="${escapeAttr(fields.idNumber)}" placeholder="请输入身份证号" />
-          </div>
-          <div class="form-group">
-            <label for="phone">手机号</label>
-            <input type="text" id="phone" value="${escapeAttr(fields.phone)}" placeholder="请输入手机号" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="email">邮箱</label>
-          <input type="email" id="email" value="${escapeAttr(fields.email)}" placeholder="请输入邮箱" />
-        </div>
-        <div class="form-group">
-          <label for="address">地址</label>
-          <input type="text" id="address" value="${escapeAttr(fields.address)}" placeholder="请输入地址" />
-        </div>
-      </div>
-
-      <div id="studentFieldsSection" class="settings-section ${type !== 'student' ? 'hidden' : ''}">
-        <h2>学生信息</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="school">学校</label>
-            <input type="text" id="school" value="${escapeAttr(fields.school ?? '')}" placeholder="请输入学校" />
-          </div>
-          <div class="form-group">
-            <label for="major">专业</label>
-            <input type="text" id="major" value="${escapeAttr(fields.major ?? '')}" placeholder="请输入专业" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="studentId">学号</label>
-            <input type="text" id="studentId" value="${escapeAttr(fields.studentId ?? '')}" placeholder="请输入学号" />
-          </div>
-          <div class="form-group">
-            <label for="degree">学历</label>
-            <select id="degree">
-              <option value="">请选择</option>
-              <option value="本科" ${fields.degree === '本科' ? 'selected' : ''}>本科</option>
-              <option value="硕士" ${fields.degree === '硕士' ? 'selected' : ''}>硕士</option>
-              <option value="博士" ${fields.degree === '博士' ? 'selected' : ''}>博士</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="gpa">GPA</label>
-            <input type="text" id="gpa" value="${escapeAttr(fields.gpa ?? '')}" placeholder="请输入 GPA" />
-          </div>
-          <div class="form-group">
-            <label for="enrollmentYear">入学年份</label>
-            <input type="text" id="enrollmentYear" value="${escapeAttr(fields.enrollmentYear ?? '')}" placeholder="例如 2022" />
-          </div>
-        </div>
-      </div>
-
-      <div id="civilServantFieldsSection" class="settings-section ${type !== 'civil_servant' ? 'hidden' : ''}">
-        <h2>公务员信息</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="employeeId">工号</label>
-            <input type="text" id="employeeId" value="${escapeAttr(fields.employeeId ?? '')}" placeholder="请输入工号" />
-          </div>
-          <div class="form-group">
-            <label for="department">部门</label>
-            <input type="text" id="department" value="${escapeAttr(fields.department ?? '')}" placeholder="请输入部门" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="position">职务</label>
-            <input type="text" id="position" value="${escapeAttr(fields.position ?? '')}" placeholder="请输入职务" />
-          </div>
-          <div class="form-group">
-            <label for="rank">职级</label>
-            <input type="text" id="rank" value="${escapeAttr(fields.rank ?? '')}" placeholder="请输入职级" />
-          </div>
-        </div>
+        <h2>个人信息</h2>
+        <div id="fieldList">${fieldRowsHtml}</div>
+        <button class="add-btn" id="addFieldBtn">+ 添加字段</button>
       </div>
 
       <div class="settings-section">
@@ -342,22 +232,28 @@ function renderSettingsPage() {
     </div>
   `;
 
-  const profileTypeEl = document.getElementById('profileType') as HTMLSelectElement;
-  profileTypeEl?.addEventListener('change', () => {
-    const t = profileTypeEl.value as ProfileType;
-    document.getElementById('studentFieldsSection')?.classList.toggle('hidden', t !== 'student');
-    document.getElementById('civilServantFieldsSection')?.classList.toggle('hidden', t !== 'civil_servant');
+  document.getElementById('addFieldBtn')?.addEventListener('click', () => {
+    const list = document.getElementById('fieldList')!;
+    const row = createFieldRowEl('', '');
+    list.appendChild(row);
+    row.querySelector<HTMLInputElement>('.field-key')?.focus();
   });
 
   document.getElementById('saveBtn')?.addEventListener('click', saveSettings);
 }
 
-// ── Text Fields ──
+function createFieldRowHtml(key: string, value: string): string {
+  const id = nextFieldId++;
+  return `
+    <div class="field-row" data-id="${id}">
+      <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
+      <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
+      <button class="btn-delete" title="删除">&times;</button>
+    </div>
+  `;
+}
 
-let textFields: { key: string; value: string }[] = [];
-let nextFieldId = 0;
-
-function createFieldRow(key: string, value: string): HTMLDivElement {
+function createFieldRowEl(key: string, value: string): HTMLDivElement {
   const id = nextFieldId++;
   const row = document.createElement('div');
   row.className = 'field-row';
@@ -365,43 +261,38 @@ function createFieldRow(key: string, value: string): HTMLDivElement {
   row.innerHTML = `
     <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
     <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
-    <button class="btn-delete" title="删除">×</button>
+    <button class="btn-delete" title="delete">&times;</button>
   `;
   row.querySelector('.btn-delete')!.addEventListener('click', () => row.remove());
   return row;
 }
 
-function readSettingsFields(): ProfileFields {
-  const fields: Record<string, string> = {};
-  for (const id of SETTINGS_FIELD_IDS) {
-    fields[id] = getEl(id)?.value.trim() ?? '';
-  }
-  return fields as unknown as ProfileFields;
-}
-
 async function saveSettings() {
-  const profileType = (document.getElementById('profileType') as HTMLSelectElement).value as ProfileType;
-  const fields = readSettingsFields();
-
-  await setProfile(profileType, fields);
-  await setApiConfig({
-    baseUrl: getEl('baseUrl').value.trim(),
-    apiKey: getEl('apiKey').value.trim(),
-    model: getEl('model').value.trim(),
+  const rows = document.querySelectorAll<HTMLElement>('.field-row');
+  const fields: { key: string; value: string }[] = [];
+  rows.forEach((row) => {
+    const key = (row.querySelector('.field-key') as HTMLInputElement)?.value.trim() ?? '';
+    const value = (row.querySelector('.field-value') as HTMLInputElement)?.value.trim() ?? '';
+    if (key) fields.push({ key, value });
   });
 
-  // Refresh local cache
-  profileData = { profileType, fields };
+  await saveAllTextFields(fields);
+  textFields = fields;
+
+  await setApiConfig({
+    baseUrl: (document.getElementById('baseUrl') as HTMLInputElement).value.trim(),
+    apiKey: (document.getElementById('apiKey') as HTMLInputElement).value.trim(),
+    model: (document.getElementById('model') as HTMLInputElement).value.trim(),
+  });
+
   apiConfigData = {
-    baseUrl: getEl('baseUrl').value.trim(),
-    apiKey: getEl('apiKey').value.trim(),
-    model: getEl('model').value.trim(),
+    baseUrl: (document.getElementById('baseUrl') as HTMLInputElement).value.trim(),
+    apiKey: (document.getElementById('apiKey') as HTMLInputElement).value.trim(),
+    model: (document.getElementById('model') as HTMLInputElement).value.trim(),
   };
 
   showStatus('已保存');
 }
-
-// ── API Config ──
 
 function showStatus(text: string) {
   const statusMsg = document.getElementById('statusMsg');
@@ -430,12 +321,12 @@ function escapeAttr(text: string): string {
 
 // ===== Init =====
 async function init() {
-  const [{ profileType, fields }, apiConfig] = await Promise.all([
-    getProfile(),
+  const [fields, apiConfig] = await Promise.all([
+    getAllTextFields(),
     getApiConfig(),
   ]);
 
-  profileData = { profileType, fields };
+  textFields = fields;
   apiConfigData = apiConfig;
 
   switchPage('profile');

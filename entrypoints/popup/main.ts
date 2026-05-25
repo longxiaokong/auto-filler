@@ -47,10 +47,10 @@ async function init() {
     isApiConfigured(),
   ]);
 
-  renderHeader(profileType);
+  renderHeader();
 
-  if (!profileReady || !apiReady) {
-    renderNotConfigured(!profileReady);
+  if (!hasFields || !apiReady) {
+    renderNotConfigured(!hasFields);
     return;
   }
 
@@ -66,7 +66,7 @@ function renderHeader() {
       <span class="logo-text">智能填表助手</span>
     </div>
     <div class="header-right">
-      <button class="avatar-btn" id="avatarBtn" title="工作台">${PROFILE_TYPE_LABELS[profileType]?.[0] || '用'}</button>
+      <button class="avatar-btn" id="avatarBtn" title="工作台">用</button>
       <button class="close-btn" id="closeBtn" title="关闭">&times;</button>
     </div>
   `;
@@ -98,8 +98,8 @@ function renderNotConfigured(needProfile: boolean) {
   main.innerHTML = `
     <div class="not-configured">
       <div class="icon">⚙️</div>
-      <p>${needProfile ? '请先在设置页录入个人信息' : '请先在设置页配置 API Key'}</p>
-      <span class="settings-link" id="goSettings">前往设置</span>
+      <p>${needProfile ? '请先在工作台录入个人信息' : '请先在工作台配置 API Key'}</p>
+      <span class="settings-link" id="goSettings">前往工作台</span>
     </div>
   `;
   document.getElementById('goSettings')!.addEventListener('click', () => {
@@ -143,7 +143,6 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
 
   const items: DisplayItem[] = [];
 
-  // Matched items first
   for (const m of scanResp.matches) {
     const field = scanResp.fields.find((f) => f.index === m.index);
     items.push({
@@ -155,7 +154,6 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
     });
   }
 
-  // Unmatched fields
   for (const f of scanResp.fields) {
     if (!matchedSet.has(f.index)) {
       items.push({
@@ -248,7 +246,6 @@ function renderResult(scanResp: ScanResponse) {
     list.appendChild(li);
   }
 
-  // Bind checkbox events
   list.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:not([disabled])').forEach((cb) => {
     cb.addEventListener('change', () => {
       const idx = Number(cb.dataset.idx);
