@@ -73,8 +73,7 @@ function renderHeader() {
   app.appendChild(header);
 
   document.getElementById('avatarBtn')!.addEventListener('click', () => {
-    const extId = chrome.runtime.id;
-    window.open(`http://localhost:5173?extId=${extId}`);
+    chrome.runtime.openOptionsPage();
   });
   document.getElementById('closeBtn')!.addEventListener('click', () => {
     window.close();
@@ -103,8 +102,7 @@ function renderNotConfigured(needProfile: boolean) {
     </div>
   `;
   document.getElementById('goSettings')!.addEventListener('click', () => {
-    const extId = chrome.runtime.id;
-    window.open(`http://localhost:5173?extId=${extId}`);
+    chrome.runtime.openOptionsPage();
   });
 }
 
