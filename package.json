@@ -19,5 +19,8 @@
     "@types/chrome": "^0.1.42",
     "typescript": "^5.9.3",
     "wxt": "^0.20.26"
+  },
+  "dependencies": {
+    "pinyin-pro": "^3.28.1"
   }
 }

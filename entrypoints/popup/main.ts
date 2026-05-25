@@ -27,12 +27,14 @@ interface FillResponse {
 }
 
 type ViewState = 'idle' | 'scanning' | 'result' | 'filling' | 'filled';
+type Confidence = MatchResult['confidence'];
 
 interface DisplayItem {
   index: number;
   label: string;
   value: string;
   status: 'matched' | 'pending' | 'unmatched';
+  confidence?: Confidence;
   checked: boolean;
 }
 
@@ -142,13 +144,14 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
   const items: DisplayItem[] = [];
 
   for (const m of scanResp.matches) {
-    const field = scanResp.fields.find((f) => f.index === m.index);
+    const confidence = normalizeConfidence(m.confidence);
     items.push({
       index: m.index,
-      label: getFieldLabel(field, m.index),
+      label: shortenLabel(m.shortLabel || m.fieldKey || `字段 #${m.index}`),
       value: m.value,
-      status: 'matched',
-      checked: true,
+      status: confidence === 'high' ? 'matched' : 'pending',
+      confidence,
+      checked: confidence !== 'low',
     });
   }
 
@@ -167,9 +170,18 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
   return items;
 }
 
+function normalizeConfidence(value: unknown): Confidence {
+  return value === 'high' || value === 'medium' || value === 'low' ? value : 'medium';
+}
+
+function shortenLabel(label: string): string {
+  const compact = label.replace(/\s+/g, '').replace(/[：:，,。；;|｜]/g, ' ');
+  return compact.length > 12 ? `${compact.slice(0, 12)}…` : compact;
+}
+
 function getFieldLabel(field: FormFieldInfo | undefined, index: number): string {
   if (!field) return `字段 #${index}`;
-  return field.label || field.placeholder || field.ariaLabel || field.context || field.name || field.id || `字段 #${index}`;
+  return shortenLabel(field.label || field.placeholder || field.ariaLabel || field.name || field.id || `字段 #${index}`);
 }
 
 function renderResult(scanResp: ScanResponse) {
@@ -178,7 +190,8 @@ function renderResult(scanResp: ScanResponse) {
   displayItems = buildDisplayItems(scanResp);
 
   const pendingCount = displayItems.filter((i) => i.status === 'pending').length;
-  const matchedCount = displayItems.filter((i) => i.status === 'matched').length;
+  const matchedCount = displayItems.filter((i) => i.status !== 'unmatched').length;
+  const checkedCount = displayItems.filter((i) => i.checked && i.status !== 'unmatched').length;
 
   const main = getMainContainer(true);
 
@@ -213,7 +226,7 @@ function renderResult(scanResp: ScanResponse) {
       <div class="field-list-header">
         <span class="col-label">字段</span>
         <span class="col-value">匹配内容</span>
-        <span class="col-status">状态</span>
+        <span class="col-status">置信度</span>
       </div>
       <ul class="field-list" id="fieldList"></ul>
     </div>
@@ -222,18 +235,13 @@ function renderResult(scanResp: ScanResponse) {
   const list = document.getElementById('fieldList')!;
   for (const item of displayItems) {
     const li = document.createElement('li');
-    li.className = 'field-item' + (item.status === 'pending' ? ' pending-row' : '');
+    li.className = `field-item ${item.confidence ? `confidence-${item.confidence}` : ''}`.trim();
 
     const checkboxHtml = item.status !== 'unmatched'
       ? `<input type="checkbox" data-idx="${item.index}" ${item.checked ? 'checked' : ''} />`
       : `<input type="checkbox" data-idx="${item.index}" disabled />`;
 
-    const statusHtml =
-      item.status === 'matched'
-        ? '<span class="status-tag matched">已匹配</span>'
-        : item.status === 'pending'
-          ? '<span class="status-tag pending">需确认</span>'
-          : '<span class="status-tag unmatched">未匹配</span>';
+    const statusHtml = getStatusHtml(item);
 
     li.innerHTML = `
       ${checkboxHtml}
@@ -253,7 +261,21 @@ function renderResult(scanResp: ScanResponse) {
     });
   });
 
-  renderFooter(matchedCount);
+  renderFooter(checkedCount);
+}
+
+function getStatusHtml(item: DisplayItem): string {
+  if (item.status === 'unmatched') {
+    return '<span class="status-tag unmatched">未匹配</span>';
+  }
+
+  const confidence = item.confidence ?? 'medium';
+  const labelMap: Record<Confidence, string> = {
+    high: '高',
+    medium: '中',
+    low: '低',
+  };
+  return `<span class="status-tag ${confidence}">${labelMap[confidence]}</span>`;
 }
 
 function escapeHtml(text: string): string {

@@ -1,1085 +1,583 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>报考信息填写</title>
+  <style>
+    :root {
+      --primary: #4f6ef7;
+      --primary-light: #eef1ff;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-lg: 0 4px 16px rgba(0,0,0,.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
 
+    /* header */
+    .header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    .header .brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: -.3px;
+    }
+    .header .user-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .header .user-bar a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color .15s;
+    }
+    .header .user-bar a:hover { color: var(--primary); }
+    .header .user-bar .sep { color: var(--border); }
 
+    /* banner */
+    .banner {
+      background: linear-gradient(135deg, #4f6ef7 0%, #7b5cff 100%);
+      padding: 32px 24px;
+      color: #fff;
+    }
+    .banner h1 { font-size: 22px; font-weight: 600; }
 
+    /* layout */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 24px;
+    }
 
+    /* progress */
+    .progress-bar-wrap {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .progress-bar-wrap .step-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .progress-bar-wrap .step-info strong { color: var(--primary); }
+    .progress-track {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 3px;
+      transition: width .3s;
+    }
 
+    /* step nav */
+    .step-nav {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .step-nav .step-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .12s;
+      gap: 10px;
+    }
+    .step-nav .step-item:last-child { border-bottom: none; }
+    .step-nav .step-item:hover { background: var(--primary-light); }
+    .step-nav .step-item.active {
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+      border-left: 3px solid var(--primary);
+      padding-left: 17px;
+    }
+    .step-nav .step-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .step-nav .step-icon.done { background: #dcfce7; color: var(--success); }
+    .step-nav .step-icon.pending { background: #fef2f2; color: var(--danger); }
 
+    /* status tag */
+    .status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .status-tag.unsubmitted { background: #fef2f2; color: var(--danger); }
+    .status-tag.submitted { background: #dcfce7; color: var(--success); }
 
-	<head>
-		<title>研究生报考服务系统</title> 
-        <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
-        <link rel="icon" sizes="any" mask href="/favicon.ico">
-		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <meta name="description" content="with selectable items(single &amp; multiple) and custom icons" />
-        
+    /* card */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-header {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header .badge {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--primary);
+      cursor: pointer;
+    }
+    .card-header .badge:hover { text-decoration: underline; }
 
+    /* table form */
+    .form-table { width: 100%; border-collapse: collapse; }
+    .form-table td {
+      padding: 10px 12px;
+      vertical-align: middle;
+    }
+    .form-table .td-label {
+      width: 170px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .form-table .td-value { font-size: 14px; }
+    .form-table .td-label .required { color: var(--danger); margin-left: 2px; }
+    .form-table tr { border-bottom: 1px solid #f1f5f9; }
+    .form-table tr:last-child { border-bottom: none; }
 
+    /* inputs */
+    input[type="text"],
+    select {
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+      width: 100%;
+    }
+    input[type="text"]:focus,
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79,110,247,.12);
+    }
+    input[readonly] { background: #f8fafc; color: var(--text-secondary); }
+    .input-w4 { max-width: 320px; }
+    .input-w6 { max-width: 480px; }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .input-group input { flex: 1; }
+    .btn-pick {
+      flex-shrink: 0;
+      height: 36px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-pick:hover { background: var(--primary-light); border-color: var(--primary); }
 
+    .hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-left: 6px;
+    }
 
+    /* buttons */
+    .btn-row { display: flex; justify-content: center; gap: 12px; margin-top: 20px; }
+    .btn {
+      height: 40px;
+      padding: 0 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(79,110,247,.3);
+    }
+    .btn-primary:hover { background: #3d5ce5; transform: translateY(-1px); }
 
-
-
-
-
-<link rel="stylesheet" href="/resource/libs/pintuer/pintuer.css">
-<link rel="stylesheet" href="/resource/css/style.css?1.3.59">
-<link rel="stylesheet" href="/resource/css/fakeloader.css?1.3.59">
-<link rel="stylesheet" href="/static/layer/3.1/skin/default/layer.css" id="layuicss-skinlayercss">
-  
-
-
-<script src="/static/jquery/jquery-1.12.4.min.js"></script>
-<script src="/static/jquery/jquery-migrate-1.4.1.min.js"></script>
-<script src="/resource/js/jquery.form.js?1.3.59"></script>
-<!--[if lt IE 9]><script src="/static/common/h5fix.min.js"></script><![endif]-->
-<script src="/static/common/polyfill.min.js"></script>
-<script src="/resource/js/cm.js?1.3.59"></script>
-
-<script src="/static/my97/WdatePicker.js"></script>
-<link rel="stylesheet" href="/static/my97/skin/WdatePicker.css">
-
-<script src="/static/layer/3.1/layer.js"></script>
-        <link rel="stylesheet" type="text/css" href="/resource/easycheck/plugins/div/easycheck-div.css" />
-        <script src="/resource/easycheck/easy.easycheck.js?123"></script>
-        <script src="/resource/easycheck/plugins/div/easy.easycheck-div.js"></script>
-        <script src="/resource/easycheck/lang/easy.easycheck-lang-zh_CN.js"></script>
-	</head>
+    /* footer */
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+  </style>
+</head>
 <body>
-    <div class="layout hidden-l">
-        <div class="container-layout layout-top">
-            <span class="float-right">
-                <a href="/sstm/index">返回首页</a> <span class="text-little">|</span>
-                <!-- 
-                <a href="/bs/bbk/wbsm">网报说明</a> <span class="text-little">|</span>
-                 -->
-                <a href="/ss/xcqr/updatePassword">修改密码</a> <span class="text-little">|</span> 
-                <a href="/logout">登出</a>
-            </span>
-            你好，刘智杰！
-        </div>
+
+<!-- header -->
+<div class="header">
+  <div class="brand">报考服务系统</div>
+  <div class="user-bar">
+    你好，刘智杰！
+    <span class="sep">|</span>
+    <a href="#">返回首页</a>
+    <span class="sep">|</span>
+    <a href="#">修改密码</a>
+    <span class="sep">|</span>
+    <a href="#">登出</a>
+  </div>
+</div>
+
+<!-- banner -->
+<div class="banner">
+  <h1>推免生预报名</h1>
+</div>
+
+<div class="container">
+  <!-- progress -->
+  <div class="progress-bar-wrap">
+    <span class="step-info">进度 <strong>1</strong> / 13</span>
+    <div class="progress-track"><div class="progress-fill" style="width:8%"></div></div>
+    <span class="status-tag unsubmitted">未提交</span>
+  </div>
+
+  <!-- step nav -->
+  <div class="step-nav">
+    <div class="step-item"><span class="step-icon done">✓</span> 申请须知</div>
+    <div class="step-item active"><span class="step-icon pending">✗</span> 基本信息</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 家庭主要成员</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 学习信息</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 外语水平</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 计算机水平</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 学习和工作经历</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 学术成果</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 奖励或处分（本科期间）</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 申请信息</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 上传照片</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 上传材料</div>
+    <div class="step-item"><span class="step-icon pending">✗</span> 申请信息提交</div>
+  </div>
+
+  <!-- form card -->
+  <div class="card">
+    <div class="card-header">
+      基本信息
+      <span class="badge" onclick="alert('敏感信息展示')">显示敏感信息</span>
     </div>
-    <div class="header">
-        <div class="container">
-            <div class="logo">
-                <img src="/resource/images/logo-name.png" alt="">
-                <h1 class="hidden-l">研究生报考服务系统</h1>
-            </div>
-            <!--<ul class="nav">
-                <li class="active"><a href="#">首页</a></li>
-                <li><a href="#">招生目录</a></li>
-                <li><a href="#">招生简章</a></li>
-                <li><a href="#">关于</a></li>
-            </ul>-->
-        </div>
-    </div>
-     <div class="banner-small">
-        <div class="container banner-content">
-        	
-            
-        		<h1 class="xly text-noselect">全国优秀大学生推免生预报名</h1>
-        	
-        </div>
-        <div class="banner-mask"></div>
-    </div>
-    <!--报考信息-->
-    <section class="container">
-        <!--保存url  -->
+    <table class="form-table">
+      <tr>
+        <td class="td-label">报名号</td>
+        <td class="td-value">20273320502</td>
+      </tr>
+      <tr>
+        <td class="td-label">姓名<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w4" value="刘智杰" id="xm">
+          <span class="hint">字库中没有的汉字用大写汉语拼音字母代替，中间无空格</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">姓名拼音<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w4" value="" id="xmpy" placeholder="如：Liu Zhijie">
+          <span class="hint">按紧左原则，字母间不加任何字符</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">证件类型</td>
+        <td class="td-value">居民身份证</td>
+      </tr>
+      <tr>
+        <td class="td-label">证件号码</td>
+        <td class="td-value">**************6016</td>
+      </tr>
+      <tr>
+        <td class="td-label">出生日期<span class="required">*</span></td>
+        <td class="td-value">20050214</td>
+      </tr>
+      <tr>
+        <td class="td-label">民族<span class="required">*</span></td>
+        <td class="td-value">
+          <select class="input-w4" id="mz">
+            <option value="">-- 请选择 --</option>
+            <option value="01">汉族</option>
+            <option value="02">蒙古族</option>
+            <option value="03">回族</option>
+            <option value="04">藏族</option>
+            <option value="05">维吾尔族</option>
+            <option value="06">苗族</option>
+            <option value="07">彝族</option>
+            <option value="08">壮族</option>
+            <option value="09">布依族</option>
+            <option value="10">朝鲜族</option>
+            <option value="11">满族</option>
+            <option value="12">侗族</option>
+            <option value="13">瑶族</option>
+            <option value="14">白族</option>
+            <option value="15">土家族</option>
+            <option value="16">哈尼族</option>
+            <option value="17">哈萨克族</option>
+            <option value="18">傣族</option>
+            <option value="19">黎族</option>
+            <option value="20">傈僳族</option>
+            <option value="21">佤族</option>
+            <option value="22">畲族</option>
+            <option value="23">高山族</option>
+            <option value="24">拉祜族</option>
+            <option value="25">水族</option>
+            <option value="26">东乡族</option>
+            <option value="27">纳西族</option>
+            <option value="28">景颇族</option>
+            <option value="29">柯尔克孜族</option>
+            <option value="30">土族</option>
+            <option value="31">达斡尔族</option>
+            <option value="32">仫佬族</option>
+            <option value="33">羌族</option>
+            <option value="34">布朗族</option>
+            <option value="35">撒拉族</option>
+            <option value="36">毛南族</option>
+            <option value="37">仡佬族</option>
+            <option value="38">锡伯族</option>
+            <option value="39">阿昌族</option>
+            <option value="40">普米族</option>
+            <option value="41">塔吉克族</option>
+            <option value="42">怒族</option>
+            <option value="43">乌孜别克族</option>
+            <option value="44">俄罗斯族</option>
+            <option value="45">鄂温克族</option>
+            <option value="46">德昂族</option>
+            <option value="47">保安族</option>
+            <option value="48">裕固族</option>
+            <option value="49">京族</option>
+            <option value="50">塔塔尔族</option>
+            <option value="51">独龙族</option>
+            <option value="52">鄂伦春族</option>
+            <option value="53">赫哲族</option>
+            <option value="54">门巴族</option>
+            <option value="55">珞巴族</option>
+            <option value="56">基诺族</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">性别<span class="required">*</span></td>
+        <td class="td-value">男</td>
+      </tr>
+      <tr>
+        <td class="td-label">婚否<span class="required">*</span></td>
+        <td class="td-value">
+          <select class="input-w4" id="hfm">
+            <option value="">-- 请选择 --</option>
+            <option value="0">未婚</option>
+            <option value="1">已婚</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">政治面貌<span class="required">*</span></td>
+        <td class="td-value">
+          <select class="input-w4" id="zzmmm">
+            <option value="">-- 请选择 --</option>
+            <option value="01">中共党员</option>
+            <option value="02">中共预备党员</option>
+            <option value="03">共青团员</option>
+            <option value="04">民主党派</option>
+            <option value="05">群众</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">现役军人<span class="required">*</span></td>
+        <td class="td-value">
+          <select class="input-w4" id="xyjrm">
+            <option value="">-- 请选择 --</option>
+            <option value="0">非现役军人</option>
+            <option value="1">现役军人</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">出生地<span class="required">*</span></td>
+        <td class="td-value">
+          <div class="input-group input-w4">
+            <input type="text" readonly value=" " id="csdmmc">
+            <button type="button" class="btn-pick" onclick="alert('选择地区')">选择</button>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">籍贯地<span class="required">*</span></td>
+        <td class="td-value">
+          <div class="input-group input-w4">
+            <input type="text" readonly value=" " id="jgdmmc">
+            <button type="button" class="btn-pick" onclick="alert('选择地区')">选择</button>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">户口所在地<span class="required">*</span></td>
+        <td class="td-value">
+          <div class="input-group input-w4">
+            <input type="text" readonly value=" " id="hkszdmc">
+            <button type="button" class="btn-pick" onclick="alert('选择地区')">选择</button>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">户口详细地址<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w6" id="hkszdxxdz" placeholder="请填写户口所在地详细地址">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">档案所在地<span class="required">*</span></td>
+        <td class="td-value">
+          <div class="input-group input-w4">
+            <input type="text" readonly value=" " id="daszdmc">
+            <button type="button" class="btn-pick" onclick="alert('选择地区')">选择</button>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">档案所在单位<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w6" id="daszdw" placeholder="请填写档案所在单位">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">档案单位地址<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w6" id="daszdwdz" placeholder="请填写档案所在单位地址">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">档案单位邮编<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w4" id="daszdwyzbm" placeholder="6位邮政编码" maxlength="6">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">通讯地址<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w6" id="txdz" placeholder="请务必填写详细准确">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">通讯邮编<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w4" id="yzbm" placeholder="6位邮政编码" maxlength="6">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">固定电话</td>
+        <td class="td-value">
+          <input type="text" class="input-w4" id="lxdh" placeholder="例：021-65644159">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">移动电话<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w4" value="186****7598" id="yddh">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">电子邮箱<span class="required">*</span></td>
+        <td class="td-value">
+          <input type="text" class="input-w4" id="dzxx" placeholder="如：example@mail.com">
+        </td>
+      </tr>
+      <tr>
+        <td class="td-label">备用信息</td>
+        <td class="td-value">
+          <input type="text" class="input-w6" id="byxx1">
+        </td>
+      </tr>
+    </table>
+  </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!-- action="/bs/xlytm/bmxxStep2" -->
-<form id="step1Form" method="post" class="form-x"  easycheck="true"   >
-	 <div class="line">
-        	<div class="xs2" >
-        		
-
-<style>
-	.succ{
-		color: green;
-		position: absolute;
-    display: block;
-    width: 20px;
-    height: 20px;
-    top: 20%;
-    right: 3px;
-	}
-	.err{
-		color: red;
-		position: absolute;
-    display: block;
-    width: 20px;
-    height: 20px;
-    top: 20%;
-    right: 3px;
-	}
-	.icon-times{
-	}
-	.icon-check{
-	}
-	
-	.info-group{
-			color: #6379bb;
-		    font-size: 18px;
-		    margin-bottom: 5px;
-		    padding-bottom: 5px;
-		}		
-	.input{
-		display: inline;
-	}
-	.info-sub-group{
-		border-bottom: 0 !important;
-	}
-	.tdlabel{
-		width:20%;
-		vertical-align: middle !important;
-	}
-	.tdwy1{
-		width:5%;
-		vertical-align: middle !important;
-	}
-	.tdwy2{
-		width:7%;
-		vertical-align: middle !important;
-	}
-	.tdwy3{
-		width:10%;
-		vertical-align: middle !important;
-	}
-	.tdwy4{
-		width:14%;
-		vertical-align: middle !important;
-	}
-	.tdwy5{
-		width:24%;
-		vertical-align: middle !important;
-	}
-	.tdvalue{
-		width: 80%;
-	}
-	.w4{
-	
-		width: 40%
-	}
-	.w6{
-	
-		width: 60%
-	}
-	
-	 #btn{
-            margin-right: 5px;
-        }
-        #btn{
-            padding: 5px 10px;
-            background: #00b0f0;
-            color: #FFF;
-            border: none;
-            border-radius: 5px;
-            }
-	
-	.ireadonly{
-			background-color: white !important;
-		}
-		.addon{
-			cursor: pointer;
-		}
-		.thlabel{
-			text-align: center !important;
-		}
-	
-</style>
-<ul class="pageScroll left" id="pageScroll" style="z-index: 999">
-	
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-				
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vc3F4eiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">申请须知
-    				<span class="icon-check succ"></span>
-    			</a>
-			
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				class="scrollNav scrollNav_ active"
-				
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vamJ4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">基本信息
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vanRjeSMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">家庭主要成员
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0veHh4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">学习信息
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vd3lzcCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">外语水平
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vanNqc3AjMDg0MjUyZTgtZDMxZC00NmEzLTgyNTQtY2ZkMmJhODcwMzVk">计算机水平
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0veHhnempsIzA4NDI1MmU4LWQzMWQtNDZhMy04MjU0LWNmZDJiYTg3MDM1ZA__">学习和工作经历
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0veHNjZyMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">学术成果
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vamxjZiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">奖励或处分（本科期间）
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vYmt4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">申请信息
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vc2N6cCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">上传照片
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vc2NjbCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">上传材料
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-	
-		<li 
-				
-				
-				class="scrollNav scrollNav_ "
-				
-		><!-- active -->
-		
-			
-			
-			
-				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vYm14eGh6IzA4NDI1MmU4LWQzMWQtNDZhMy04MjU0LWNmZDJiYTg3MDM1ZA__">申请信息提交
-    				<span class="icon-times err"></span>
-    			</a>
-			
-		
-    		
-    		
-    		
-   		</li>
-   		
-   
-   <div style="padding-top: 5px;padding-left: 4px">
-   	<dl>
-                                    <dt>报名状态：
-                                    <span class="">
-                                    	
-	                               			
-	                               				<font color="red">未提交</font>
-	                               			
-	                               			
-	                               			
-	                               			
-                           				
-                                    </span>
-                                    </dt>
-                                </dl>
-   </div>
-</ul>
-<script>
-$(window).resize(function () {   
-	initSize();
-});
-
-function remove(obj){
-	$(obj).parent().parent().remove();
-}
-
-function initSize(){
-	var jg = isOverlap('.xs10','#pageScroll');
-	if(jg<0){
-		$("#a1").html(jg);
-		$(".pageScroll").css('left',jg+'px');
-	}else{
-		$(".pageScroll").css('left','0px');
-	}
-}
-$(function(){
-	
-	$('form').find(":input[name]").not(":button,:reset,:image,:submit").each(function(ndx, ele) {
-		$(this).attr('autocomplete','new-text');
-	});
-	
-	
-	$("#ywcbs").html($(".succ").length);
-	window.onscroll=function(){
-		var top1=document.documentElement.scrollTop;
-		if(top1>=300){
-			$(".pageScroll").css("position","absolute").css("top",top1-300);
-		}else{
-			$(".pageScroll").css("position","absolute").css("top",5); 
-		}
-	}
-	initSize();
-
-});
-
-
-function isOverlap(idOne,idTwo){
-    var objOne=$(idOne),
-        objTwo=$(idTwo),
-        offsetOne = objOne.offset(),
-        offsetTwo = objTwo.offset(),
-        leftOne=offsetOne.left,
-        leftTwo=offsetTwo.left,
-        widthOne = objOne.width(),
-        widthTwo = 200;
-    var leftTop = leftOne -( leftTwo+widthTwo);
-    return leftTop;
-}
-</script>
-        	</div>
-        	<div class="xs10" id="xsjbxx">
-	 
-
-
-<style>
-	#txbs{
-		color: #FF9500;
-		font-size: 16px;
-		ont-weight: 700;
-	}
-</style>
-<ul class="bread" style="font-size: 14px;">
-            <li><span class="Icon Icon-home"></span><a href="/sstm/index">首页</a></li>
-            <li>填写/修改申请信息&nbsp;&nbsp;<span id="txbs">已完成<span id="ywcbs"></span>步</span><span style="font-size: 16px;">&nbsp;（共13步）</span></li>
-</ul>
-      <div class="info-group info-sub-group" style="position: relative;margin-top: 5px;">
-        	基本信息 
-            		<a href="#" class="button bg-sub " style="" id="showinfo">显示敏感信息</a>
-            	
-        	<br>
-      </div>
-      <div class="table-responsive">
-      	<table class="table">
-      		<input type="text" value="" id="jbxxym" name="jbxxym" style="DISPLAY: none">
-      		<input type="hidden" value="刘智杰" id="username" name="username"/>
-      			<tr>
-					<td class="tdlabel"><b>报名号</b></td>
-					<td class="tdvalue">20273320502
-					</td>
-				</tr>
-      			
-				<tr>
-					<td class="tdlabel"><b>姓名<font color="red">*</font></b></td>
-					<td class="tdvalue"><input name="xm" class="input w4 required"
-						type="text" value="刘智杰" id="xm">&nbsp;字库中没有的汉字用大写汉语拼音字母代替，中间无空格&nbsp;
-					</td>
-				</tr>
-
-
-				<tr>
-					<td class="tdlabel"><b>姓名拼音<font color="red">*</font></b></td>
-					<td class="tdvalue"><input name="xmpy" type="text"
-						class="input w4 required" value="" id="xmpy">&nbsp;按紧左原则，字母间不加任何字符&nbsp;
-						&nbsp;<span id="xmpySpan" style="display: none;color: red"></span>
-					</td>
-				</tr>
-				
-				<tr>
-					<td class="tdlabel">
-						<b>证件类型</b>
-					</td>
-					<td class="tdvalue">
-						居民身份证
-					</td>
-				</tr>
-				
-				<tr>
-					<td class="tdlabel">
-						<b>证件号码</b>
-					</td>
-					<td class="tdvalue">
-						**************6016
-					</td>
-				</tr>
-				
-				<tr>
-					<td class="tdlabel">
-						<b>出生日期<font color="red">*</font></b>
-					</td>
-					<td class="tdvalue">
-						
-							
-								20050214
-							
-							
-						 
-					</td>
-				</tr>
-				
-				<tr>
-					<td class="tdlabel">
-						<b>民族<font color="red">*</font></b>
-					</td>
-					<td class="tdvalue">
-						<select name="mzm" id="mz" class="input w4 input-auto required" selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL216eHojMDg0MjUyZTgtZDMxZC00NmEzLTgyNTQtY2ZkMmJhODcwMzVk" val=""></select>
-					</td>
-				</tr>
-
-
-				<tr>
-					<td class="tdlabel"><b>性别<font color="red">*</font></b></td>
-					<td class="tdvalue" class="input w3 input-auto ">
-					
-						
-							男
-						
-						
-					 
-					
-					&nbsp;<span id="xbSpan" style="display: none;color: red"></span>
-					</td>
-					
-				</tr>
-				<tr>
-					<td class="tdlabel"><b>婚否<font color="red">*</font></b></td>
-					<td class="tdvalue" class="input  input-auto ">
-					<select
-						name="hfm" id="hfm" class="input w4 input-auto required"
-						selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL2h5emt4eiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_" val="">
-						</select>
-					</td>
-				</tr>
-				<tr>
-					<td class="tdlabel"><b>政治面貌<font color="red">*</font></b></td>
-					<td class="tdvalue" class="input  input-auto ">
-					<select
-						name="zzmmm" id="zzmmm" class="input w4 input-auto required "
-						selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL3p6bW14eiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_" val="">
-					</select> 
-					</td>
-				</tr>
-				
-				<tr>
-					<td class="tdlabel"><b>现役军人码<font color="red">*</font></b></td>
-					<td class="tdvalue" class="input  input-auto  ">
-					<select
-						name="xyjrm" id="xyjrm" class="input w4 input-auto required"
-						selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL3NmeHlqcnh6X2JzIzA4NDI1MmU4LWQzMWQtNDZhMy04MjU0LWNmZDJiYTg3MDM1ZA__" val="">
-					</select>
-					</td>
-				</tr>
-				
-				
-				<tr>
-					<td class="tdlabel">
-						<b>出生地<font color="red">*</font></b>
-					</td>
-					<td class="tdvalue">
-						<input type="hidden" id="csdm" name="csdm" value="">
-						<input type="hidden" id="csd" name="csd" value="">
-						<div class="input-group w4">
-							<input name="csdmmc" type="text" class="input ireadonly required" disabled="disabled" id="csdmmc" value=" ">
-							
-							<span class="addon" onclick="chooseArea('csdm','csd','csdmmc')">选择</span>
-							
-						</div>
-					</td>
-				</tr>
-				<tr>
-					<td class="tdlabel"><b>籍贯地<font color="red">*</font></b></td>
-					<td class="tdvalue"><input type="hidden" id="jgszdm" name="jgszdm" value="">
-					<input type="hidden" id="jgszd" name="jgszd" value="">
-						<div class="input-group w4">
-							<input name="jgdmmc" type="text" id="jgdmmc"
-								value=" " type="text"
-								class="input ireadonly required" disabled="disabled"> <span class="addon"
-								onclick="chooseArea('jgszdm','jgszd','jgdmmc')">选择</span>
-						</div>
-					</td>
-				</tr>
-				<tr>
-					<td class="tdlabel"><b>户口所在地<font color="red">*</font></b></td>
-					<td class="tdvalue"><input type="hidden" id="hkszdm" name="hkszdm" value="">
-					<input type="hidden" id="hkszd" name="hkszd" value="">
-						<div class="input-group w4">
-							<input name="hkszdmc" type="text" id="hkszdmc"
-								value=" " 
-								class="input ireadonly required" disabled="disabled"> <span class="addon"
-								onclick="chooseArea('hkszdm','hkszd','hkszdmc')">选择</span>
-						</div>
-					</td>
-					
-				</tr>
-				<tr>
-					<td class="tdlabel"><b>户口所在地详细地址<font color="red">*</font></b></td>
-					<td class="tdvalue"><input class="input w4 required" name="hkszdxxdz"
-						type="text" value="" id="hkszdxxdz">
-					</td>
-				</tr>
-				<tr>
-					<td class="tdlabel"><b>档案所在地<font color="red">*</font></b></td>
-					<td class="tdvalue"><input type="hidden" name="daszdm"
-						id="daszdm" value=""><input type="hidden" name="daszd"
-						id="daszd" value="">
-						<div class="input-group w4">
-							<input name="daszdmc" type="text" id="daszdmc"
-								value=" "
-								class="input ireadonly required" disabled="disabled"> <span class="addon"
-								onclick="chooseArea('daszdm','daszd','daszdmc')">选择</span>
-						</div>
-					</td>
-				</tr>
-
-				<tr>
-					<td class="tdlabel"><b>档案所在单位<font color="red">*</font></b></td>
-					<td class="tdvalue"><input class="input w4 required" name="daszdw" type="text"
-						value="" id="daszdw">
-					</td>
-				</tr>
-
-				<tr>
-					<td class="tdlabel"><b>档案所在单位地址<font color="red">*</font></b></td>
-					<td class="tdvalue"><input class="input w4 required" name="daszdwdz"
-						type="text" value="" id="daszdwdz">
-					</td>
-				</tr>
-				
-				<tr>
-					<td class="tdlabel"><b>档案所在单位邮政编码<font color="red">*</font></b></td>
-					<td class="tdvalue">
-					<input class="input w4 required number" minlength="6" maxlength="6" name="daszdwyzbm" type="text" value=""
-						 id="daszdwyzbm">
-					</td>
-				</tr>
-				<tr>
-				<td class="tdlabel">
-					<b>通迅地址<font color="red">*</font></b>
-				</td>
-				<td class="tdvalue">
-					<input name="txdz" class="input w4 required" type="text" value="" id="txdz">
-					&nbsp;请务必填写详细准确
-				</td>
-			</tr>
-			<tr>
-				<td class="tdlabel">
-					<b>通信地址邮政编码<font color="red">*</font></b>
-				</td>
-				<td class="tdvalue">
-					<input name="yzbm" class="input w4 required number" maxlength="6" maxlength="6" type="text" value="" id="yzbm">
-				</td>
-			</tr>
-			<tr>
-				<td class="tdlabel">
-					<b>固定电话</b>
-				</td>
-				<td class="tdvalue">
-					<input name="lxdh" class="input w4 " type="text" value="" id="lxdh">
-					&nbsp;(例:021-65644159)
-				</td>
-			</tr>
-			<tr>
-				<td class="tdlabel">
-					<b>移动电话<font color="red">*</font></b>
-				</td>
-				<td class="tdvalue">
-					<input type="hidden" id="oyddh" value="186****7598">
-           			 <input type="hidden" id="odzxx" value="">
-           			 <input type="hidden" id="olxdh" value="">
-					<input name="yddh" class="input w4 required"  type="text" value="186****7598" id="yddh">
-				</td>
-			</tr>
-			<tr>
-				<td class="tdlabel">
-					<b>考生电子邮箱<font color="red">*</font></b>
-				</td>
-				<td class="tdvalue">
-					<input type="text" id="dzxxOld" value="" style="DISPLAY: none">
-					<input name="dzxx" class="input w4 required " type="text" value="" id="dzxx">
-				</td>
-			</tr>
-			<tr>
-				<td class="tdlabel">
-					<b>备用信息</b>
-				</td>
-				<td class="tdvalue">
-					<input name="byxx1" class="input w4 " type="text" value="" id="byxx1">
-				</td>
-			</tr>
-			</table>
-      </div>	
-      </div>
-	</div>	
-</form>
-	<ul class="pager"> 
-			
-            <li><button  class="button bg-sub" id="nextStep">下一步</button> </li>
-     </ul>
-
-
-
-
-<script type="text/javascript">
-
-jQuery(function($) {
-	selectCombox('');
-	/* EasyCheck.msgs['zjhm'] = {
-			'[reg]': '请输入正确的身份证号'
-		}; */
-	
-	
-	
-	});
-	
-	
-	
-	
-	function jyxmpy(){
-		var xmpy=$("#xmpy").val();
-		if(xmpy.indexOf(" ")!=-1){
-			showmessage('error','姓名拼音中间不要出现空格！');
-			return false;
-		}
-		return true;
-	}
-	function jyxb(){
-		if($("#zjlx option:selected").text()=='居民身份证'){
-			 var zjhm=$("#zjhm").val();
-			 var xb=zjhm.substring(16,17);
-			 if((xb%2==0 && $("#xbm option:selected").text()=='男') ||
-					 (xb%2==1 && $("#xbm option:selected").text()=='女')){
-				$("#xbSpan").css('display','');
-				$("#xbSpan").html('请选择与身份证一致的性别！');
-				
-				 $("#xbm").focus(); 
-				 return false;
-			 }
-		}
-		$("#xbSpan").css('display','none');
-		$("#xbSpan").html('');
-		return true;
-	};
-	function jycsrq(){
-		if($("#zjlx option:selected").text()=='居民身份证'){
-			 var zjhm=$("#zjhm").val();
-			 var rq=zjhm.substring(6,14);
-			 /* if(rq!=$("#csrq").val()){
-				showmessage('error','请选择与身份证一致的出生日期！');
-				$("#csrq").focus();
-				 return false;
-			 } */
-		}
-		return true;
-	};
-	function jyzjhm(){
-		if($("#zjlx option:selected").text()=='居民身份证'){
-			var zjhm=$("#zjhm").val();
-			if(zjhm==$("#zjhmOld").val())
-				return true;
-			var res=/^(^[1-9]\d{7}((0\d)|(1[0-2]))(([0|1|2]\d)|3[0-1])\d{3}$)|(^[1-9]\d{5}[1-9]\d{3}((0\d)|(1[0-2]))(([0|1|2]\d)|3[0-1])((\d{4})|\d{3}[Xx])$)$/;
-			if(!res.test(zjhm)){
-				showmessage('error','请输入正确的身份证号！');
-				$("#zjhm").focus();
-				return false;
-			}
-		}
-		return true;
-	};
-	$("#zjhm").change(function(){
-		jyzjhm();
-	});
-	$("#xbm").change(function(){
-		jyxb();
-	});
-	$("#xmpy").change(function(){
-		jyxmpy();
-	});
-	$('#csrq').on('propertychange', function() {
-	});
-	
-	function yzkslxfs(){
-		var dh=$("#yddh").val();
-		if(dh!=$("#oyddh").val()){
-			reg=/^1(2|3|4|5|6|7|8|9)\d{9}$/;
-			if(!reg.test(dh)){
-				showmessage('error','请填写正确的手机号码！');
-				$("#yddh").focus();
-				return false;
-			}else{
-				/* var yddh = dh;
-    			var v = yddh.substring(0,3);
-    			if(v=='133'||v=='149'||v=='153'||v=='173'||v=='177'||v=='180'||v=='181'||v=='189'||v=='199'){
-    				showmessage('error','不支持电信手机号');
-    				return;
-    			} */
-			}
-		}
-		var yx=$("#dzxx").val()
-		if(yx!=$("#odzxx").val()){
-			var res=/^[A-Za-z\d]+([-_.][A-Za-z\d]+)*@([A-Za-z\d]+[-.])+[A-Za-z\d]{2,4}$/;
-			if(!res.test(yx)){
-				showmessage('error','请填写正确的电子邮箱！');
-				$("#dzxx").focus();
-				return false;
-			}
-		}
-		
-		
-		var lxdh=$("#lxdh").val();
-		if(lxdh!=$("#olxdh").val()){
-			reg=/^(\(\d{3,4}\)|\d{3,4}-|\s)?\d{7,14}$/;
-			if(!reg.test(lxdh)){
-				showmessage('error','请填写正确的固定电话！');
-				$("#lxdh").focus();
-				return false;
-			}
-		}
-		
-		return true;
-	}
-	
-	var errMsg="";
-	
-	$("#nextStep").click(function(){
-		errMsg=""
-		var result = EasyCheck.checkForm($("#step1Form"));
-		if(!jyxb()){
-			showmessage('error','请选择与身份证一致的性别！');
-			return;
-		}
-		if(!jyzjhm() || !jyxmpy() || !jycsrq()){
-			return;
-		}
-		if(!yzkslxfs()){
-			return false;
-		}
-		if( result){
-			$("#jbxxym").val('1');
-			fakeLoader(); 
-			$("#step1Form").ajaxSubmit({
-	  		 	type: 'post', // 提交方式 get/post
-	            url: '/sstm/TXlIZWFydFdpbGxHb09udG0vc2F2ZU5leHQvamJ4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_', // 需要提交的 url
-	          	success: function(data) { 
-	            	 $(".fakeloader").hide();
-	            	 if(data.code==200){
-	            		 window.location.href='/sstm/TXlIZWFydFdpbGxHb09udG0vanRjeSMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_';
-	            	 }else if(data.code==-300){
-	            		 showmessage('error','信息填写错误，请查看校验结果！');
-	            		 $("#errMsg").html(data.msg);
-	            		 $("#err").show();
-	            		 scrollToLocation();
-	            	}else{
-	            		 showmessage('error','保存失败！');
-	            	 }
-	            }
-	        });		
-		}
-		
-	});
-	
-	$("#showinfo").click(function(){
-		fakeLoader(); 
-		$.ajax({
-			type: "POST",
-			url: '/TXlIZWFydFdpbGxHb09uc3N0bS90bS9zaG93SW5mbyMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_',
-			async:false,
-			dataType: "json",
-			success:function(data,status,XHR){
-				 $(".fakeloader").hide();
-				if(data.code=='200'){
-					window.location.href="/sstm/TXlIZWFydFdpbGxHb09udG0vamJ4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_";
-				}
-			}});
-	});
-
-
-
-</script>
-    </section>
-    
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="alert('模拟保存并进入下一步')">下一步</button>
+  </div>
+</div>
 
 <div class="footer">
-    <span>中国科学技术大学研究生院 安徽省合肥市包河区金寨路96号</span>
-    <span></span>
-    <span></span>
-    <span></span>
-    <span></span>
+  报考服务系统 &copy; 2026
 </div>
-    <script type="text/javascript">
-    	var hostUrl = '';
-    </script>
+
 </body>
-<script type="text/javascript">
-	var hostUrl = '';
-	
-	var keepAliveUrl = hostUrl+"/noop/result";
-	keepAlive(3);
-
-	
-	//处理键盘事件 禁止后退键（Backspace）密码或单行、多行文本框除外
-   function banBackSpace(e){
- var ev = e || window.event;
- //各种浏览器下获取事件对象
- var obj = ev.relatedTarget || ev.srcElement || ev.target ||ev.currentTarget;
- //按下Backspace键
- if(ev.keyCode == 8){
- var tagName = obj.nodeName //标签名称
- //如果标签不是input或者textarea则阻止Backspace
- if(tagName!='INPUT' && tagName!='TEXTAREA'){
-  return stopIt(ev);
- }
- var tagType = obj.type.toUpperCase();//标签类型
- //input标签除了下面几种类型，全部阻止Backspace
- if(tagName=='INPUT' && (tagType!='TEXT' && tagType!='TEXTAREA' && tagType!='PASSWORD')){
-  return stopIt(ev);
- }
- //input或者textarea输入框如果不可编辑则阻止Backspace
- if((tagName=='INPUT' || tagName=='TEXTAREA') && (obj.readOnly==true || obj.disabled ==true)){
-  return stopIt(ev);
- }
- }
-}
-function stopIt(ev){
- if(ev.preventDefault ){
- //preventDefault()方法阻止元素发生默认的行为
- ev.preventDefault();
- }
- if(ev.returnValue){
- //IE浏览器下用window.event.returnValue = false;实现阻止元素发生默认的行为
- ev.returnValue = false;
- }
- return false;
-}
-
-	window.onload=function(){
-	    //禁止后退键 作用于Firefox、Opera
-	    document.onkeypress=banBackSpace;
-	    //禁止后退键  作用于IE、Chrome
-	    document.onkeydown=banBackSpace;
-	}
-	
-</script>
 </html>

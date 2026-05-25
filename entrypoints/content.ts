@@ -4,12 +4,14 @@ interface FormField {
   name: string;
   id: string;
   label: string;
+  hint: string;
   placeholder: string;
   ariaLabel: string;
   title: string;
   value: string;
   options: string[];
   context: string;
+  html: string;
 }
 
 interface FieldResult {
@@ -52,6 +54,18 @@ function findLabel(el: HTMLElement): string {
   if (labelledBy) {
     const refEl = document.getElementById(labelledBy);
     if (refEl) return refEl.textContent?.trim() ?? '';
+  }
+
+  const row = el.closest('tr');
+  const valueCell = el.closest('td, th');
+  if (row && valueCell) {
+    const cells = Array.from(row.querySelectorAll<HTMLElement>('td, th'));
+    const valueCellIndex = cells.indexOf(valueCell as HTMLElement);
+    const labelCell = cells
+      .slice(0, Math.max(valueCellIndex, 0))
+      .reverse()
+      .find((cell) => textWithoutControls(cell));
+    if (labelCell) return textWithoutControls(labelCell);
   }
 
   return '';
@@ -164,10 +178,7 @@ function findNearbyText(el: HTMLElement, contextRoot: HTMLElement): string {
     current = current.nextSibling;
   }
 
-  if (parts.length > 0) return parts.join(' ');
-
-  const rootText = textWithoutControls(contextRoot);
-  return rootText.length > 600 ? `${rootText.slice(0, 600)}...` : rootText;
+  return parts.join(' ');
 }
 
 function joinUnique(parts: Array<string | undefined>): string {
@@ -184,34 +195,79 @@ function joinUnique(parts: Array<string | undefined>): string {
   return result.join(' | ');
 }
 
+function getSemanticContainer(el: HTMLElement): HTMLElement {
+  const row = el.closest<HTMLElement>('tr');
+  if (row) return row;
+
+  const fieldWrapper = el.closest<HTMLElement>(
+    '.form-group, .field, .form-item, .form-row, .ant-form-item, .el-form-item, label',
+  );
+  if (fieldWrapper) return fieldWrapper;
+
+  return findNearestSingleFieldContainer(el, findContextRoot(el));
+}
+
+function sanitizeHtml(el: HTMLElement): string {
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('script, style, svg, iframe, canvas').forEach((child) => child.remove());
+
+  clone.querySelectorAll<HTMLElement>('*').forEach((node) => {
+    Array.from(node.attributes).forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const keep =
+        ['id', 'name', 'type', 'placeholder', 'title', 'aria-label', 'role'].includes(name) ||
+        name.startsWith('data-');
+      if (!keep || name.startsWith('on')) {
+        node.removeAttribute(attr.name);
+      }
+    });
+
+    if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+      node.removeAttribute('value');
+    }
+  });
+
+  return normalizeText(clone.outerHTML).slice(0, 800);
+}
+
 function findContext(el: HTMLElement): string {
   const contextRoot = findContextRoot(el);
   const singleFieldContainer = findNearestSingleFieldContainer(el, contextRoot);
   const localText = textWithoutControls(singleFieldContainer);
   const nearbyText = findNearbyText(el, contextRoot);
-  const rootText = textWithoutControls(contextRoot);
 
-  return joinUnique([
-    localText,
-    nearbyText,
-    rootText.length > 600 ? `${rootText.slice(0, 600)}...` : rootText,
-  ]);
+  return joinUnique([localText, nearbyText]);
+}
+
+function findHint(el: HTMLElement, label: string, context: string): string {
+  const singleFieldContainer = findNearestSingleFieldContainer(el, findContextRoot(el));
+  const localText = textWithoutControls(singleFieldContainer);
+  const hint = localText
+    .replace(label, '')
+    .replace(/\*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return hint || context.replace(label, '').trim();
 }
 
 function extractField(el: HTMLElement): FormField {
   const tag = el.tagName.toLowerCase();
+  const context = findContext(el);
+  const label = findLabel(el);
   return {
     tag,
     type: (el as HTMLInputElement).type ?? tag,
     name: el.getAttribute('name') ?? '',
     id: el.getAttribute('id') ?? '',
-    label: findLabel(el),
+    label,
+    hint: findHint(el, label, context),
     placeholder: el.getAttribute('placeholder') ?? '',
     ariaLabel: el.getAttribute('aria-label') ?? '',
     title: el.getAttribute('title') ?? '',
     value: getCurrentValue(el),
     options: getOptions(el),
-    context: findContext(el),
+    context,
+    html: sanitizeHtml(getSemanticContainer(el)),
   };
 }
 
