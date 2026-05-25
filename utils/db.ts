@@ -37,6 +37,7 @@ export interface Category {
 
 const DB_NAME = 'autoFillerDB';
 const DB_VERSION = 3;
+let dbInstance: IDBDatabase | null = null;
 
 const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
   { name: '身份证明', icon: '/icons/id-card.svg', sortOrder: 0, isDefault: false },
@@ -47,6 +48,7 @@ const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 ];
 
 function openDB(): Promise<IDBDatabase> {
+  if (dbInstance) return Promise.resolve(dbInstance);
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (event: IDBVersionChangeEvent) => {
@@ -72,7 +74,6 @@ function openDB(): Promise<IDBDatabase> {
         const catStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
         catStore.createIndex('sortOrder', 'sortOrder', { unique: false });
 
-        // Add categoryId index to fileRecords
         if (db.objectStoreNames.contains('fileRecords')) {
           const fileStore = req.transaction!.objectStore('fileRecords');
           if (!fileStore.indexNames.contains('categoryId')) {
@@ -80,17 +81,14 @@ function openDB(): Promise<IDBDatabase> {
           }
         }
 
-        // Seed default categories and migrate existing fileRecords
         const uncategorizedId = DEFAULT_CATEGORIES.findIndex(c => c.isDefault);
         const uncategorized = DEFAULT_CATEGORIES[uncategorizedId];
         const catAddReq = catStore.add(uncategorized);
         catAddReq.onsuccess = () => {
           const uncId = catAddReq.result as number;
-          // Seed the rest
           DEFAULT_CATEGORIES.forEach((cat, i) => {
             if (i !== uncategorizedId) catStore.add(cat);
           });
-          // Migrate existing fileRecords: set categoryId to uncategorized
           if (db.objectStoreNames.contains('fileRecords')) {
             const fileStore = req.transaction!.objectStore('fileRecords');
             const cursorReq = fileStore.openCursor();
@@ -109,7 +107,12 @@ function openDB(): Promise<IDBDatabase> {
         };
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      dbInstance = req.result;
+      dbInstance!.onclose = () => { dbInstance = null; };
+      dbInstance!.onversionchange = () => { dbInstance?.close(); dbInstance = null; };
+      resolve(dbInstance!);
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -325,4 +328,19 @@ export async function getUncategorizedId(): Promise<number | null> {
   const cats = await getAllCategories();
   const unc = cats.find(c => c.isDefault);
   return unc?.id ?? null;
+}
+
+export async function ensureCategoriesSeeded(): Promise<void> {
+  const count = await getCategoryCount();
+  if (count > 0) return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('categories', 'readwrite');
+    const store = tx.objectStore('categories');
+    for (const cat of DEFAULT_CATEGORIES) {
+      store.add(cat);
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }

@@ -3,7 +3,7 @@ import {
   getAllTextFields, saveAllTextFields, getAllBlockCategories, saveBlockCategory, deleteBlockCategory,
   getAllCategories, addCategory, updateCategory, deleteCategory,
   getAllFileRecords, getFileRecordsByCategory, addFileRecord, updateFileRecord, deleteFileRecord,
-  moveFileRecordsToCategory, getUncategorizedId,
+  moveFileRecordsToCategory, getUncategorizedId, ensureCategoriesSeeded,
 } from '../../utils/db';
 import type { TextField, BlockCategory, BlockItem, Category, FileRecord } from '../../utils/db';
 import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
@@ -1208,6 +1208,7 @@ function escapeAttr(text: string): string {
 
 // ===== Init =====
 async function init() {
+  await ensureCategoriesSeeded();
   const [rawFields, apiConfig, blocks, cats, files] = await Promise.all([
     getAllTextFields(),
     getApiConfig(),
