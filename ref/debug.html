@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html>
+
+
+
+
+
+
+
+	<head>
+		<title>研究生报考服务系统</title> 
+        <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+        <link rel="icon" sizes="any" mask href="/favicon.ico">
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="description" content="with selectable items(single &amp; multiple) and custom icons" />
+        
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/resource/libs/pintuer/pintuer.css">
+<link rel="stylesheet" href="/resource/css/style.css?1.3.59">
+<link rel="stylesheet" href="/resource/css/fakeloader.css?1.3.59">
+<link rel="stylesheet" href="/static/layer/3.1/skin/default/layer.css" id="layuicss-skinlayercss">
+  
+
+
+<script src="/static/jquery/jquery-1.12.4.min.js"></script>
+<script src="/static/jquery/jquery-migrate-1.4.1.min.js"></script>
+<script src="/resource/js/jquery.form.js?1.3.59"></script>
+<!--[if lt IE 9]><script src="/static/common/h5fix.min.js"></script><![endif]-->
+<script src="/static/common/polyfill.min.js"></script>
+<script src="/resource/js/cm.js?1.3.59"></script>
+
+<script src="/static/my97/WdatePicker.js"></script>
+<link rel="stylesheet" href="/static/my97/skin/WdatePicker.css">
+
+<script src="/static/layer/3.1/layer.js"></script>
+        <link rel="stylesheet" type="text/css" href="/resource/easycheck/plugins/div/easycheck-div.css" />
+        <script src="/resource/easycheck/easy.easycheck.js?123"></script>
+        <script src="/resource/easycheck/plugins/div/easy.easycheck-div.js"></script>
+        <script src="/resource/easycheck/lang/easy.easycheck-lang-zh_CN.js"></script>
+	</head>
+<body>
+    <div class="layout hidden-l">
+        <div class="container-layout layout-top">
+            <span class="float-right">
+                <a href="/sstm/index">返回首页</a> <span class="text-little">|</span>
+                <!-- 
+                <a href="/bs/bbk/wbsm">网报说明</a> <span class="text-little">|</span>
+                 -->
+                <a href="/ss/xcqr/updatePassword">修改密码</a> <span class="text-little">|</span> 
+                <a href="/logout">登出</a>
+            </span>
+            你好，刘智杰！
+        </div>
+    </div>
+    <div class="header">
+        <div class="container">
+            <div class="logo">
+                <img src="/resource/images/logo-name.png" alt="">
+                <h1 class="hidden-l">研究生报考服务系统</h1>
+            </div>
+            <!--<ul class="nav">
+                <li class="active"><a href="#">首页</a></li>
+                <li><a href="#">招生目录</a></li>
+                <li><a href="#">招生简章</a></li>
+                <li><a href="#">关于</a></li>
+            </ul>-->
+        </div>
+    </div>
+     <div class="banner-small">
+        <div class="container banner-content">
+        	
+            
+        		<h1 class="xly text-noselect">全国优秀大学生推免生预报名</h1>
+        	
+        </div>
+        <div class="banner-mask"></div>
+    </div>
+    <!--报考信息-->
+    <section class="container">
+        <!--保存url  -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- action="/bs/xlytm/bmxxStep2" -->
+<form id="step1Form" method="post" class="form-x"  easycheck="true"   >
+	 <div class="line">
+        	<div class="xs2" >
+        		
+
+<style>
+	.succ{
+		color: green;
+		position: absolute;
+    display: block;
+    width: 20px;
+    height: 20px;
+    top: 20%;
+    right: 3px;
+	}
+	.err{
+		color: red;
+		position: absolute;
+    display: block;
+    width: 20px;
+    height: 20px;
+    top: 20%;
+    right: 3px;
+	}
+	.icon-times{
+	}
+	.icon-check{
+	}
+	
+	.info-group{
+			color: #6379bb;
+		    font-size: 18px;
+		    margin-bottom: 5px;
+		    padding-bottom: 5px;
+		}		
+	.input{
+		display: inline;
+	}
+	.info-sub-group{
+		border-bottom: 0 !important;
+	}
+	.tdlabel{
+		width:20%;
+		vertical-align: middle !important;
+	}
+	.tdwy1{
+		width:5%;
+		vertical-align: middle !important;
+	}
+	.tdwy2{
+		width:7%;
+		vertical-align: middle !important;
+	}
+	.tdwy3{
+		width:10%;
+		vertical-align: middle !important;
+	}
+	.tdwy4{
+		width:14%;
+		vertical-align: middle !important;
+	}
+	.tdwy5{
+		width:24%;
+		vertical-align: middle !important;
+	}
+	.tdvalue{
+		width: 80%;
+	}
+	.w4{
+	
+		width: 40%
+	}
+	.w6{
+	
+		width: 60%
+	}
+	
+	 #btn{
+            margin-right: 5px;
+        }
+        #btn{
+            padding: 5px 10px;
+            background: #00b0f0;
+            color: #FFF;
+            border: none;
+            border-radius: 5px;
+            }
+	
+	.ireadonly{
+			background-color: white !important;
+		}
+		.addon{
+			cursor: pointer;
+		}
+		.thlabel{
+			text-align: center !important;
+		}
+	
+</style>
+<ul class="pageScroll left" id="pageScroll" style="z-index: 999">
+	
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+				
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vc3F4eiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">申请须知
+    				<span class="icon-check succ"></span>
+    			</a>
+			
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				class="scrollNav scrollNav_ active"
+				
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vamJ4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">基本信息
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vanRjeSMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">家庭主要成员
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0veHh4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">学习信息
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vd3lzcCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">外语水平
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vanNqc3AjMDg0MjUyZTgtZDMxZC00NmEzLTgyNTQtY2ZkMmJhODcwMzVk">计算机水平
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0veHhnempsIzA4NDI1MmU4LWQzMWQtNDZhMy04MjU0LWNmZDJiYTg3MDM1ZA__">学习和工作经历
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0veHNjZyMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">学术成果
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vamxjZiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">奖励或处分（本科期间）
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vYmt4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">申请信息
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vc2N6cCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">上传照片
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vc2NjbCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_">上传材料
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+	
+		<li 
+				
+				
+				class="scrollNav scrollNav_ "
+				
+		><!-- active -->
+		
+			
+			
+			
+				<a href="/sstm/TXlIZWFydFdpbGxHb09udG0vYm14eGh6IzA4NDI1MmU4LWQzMWQtNDZhMy04MjU0LWNmZDJiYTg3MDM1ZA__">申请信息提交
+    				<span class="icon-times err"></span>
+    			</a>
+			
+		
+    		
+    		
+    		
+   		</li>
+   		
+   
+   <div style="padding-top: 5px;padding-left: 4px">
+   	<dl>
+                                    <dt>报名状态：
+                                    <span class="">
+                                    	
+	                               			
+	                               				<font color="red">未提交</font>
+	                               			
+	                               			
+	                               			
+	                               			
+                           				
+                                    </span>
+                                    </dt>
+                                </dl>
+   </div>
+</ul>
+<script>
+$(window).resize(function () {   
+	initSize();
+});
+
+function remove(obj){
+	$(obj).parent().parent().remove();
+}
+
+function initSize(){
+	var jg = isOverlap('.xs10','#pageScroll');
+	if(jg<0){
+		$("#a1").html(jg);
+		$(".pageScroll").css('left',jg+'px');
+	}else{
+		$(".pageScroll").css('left','0px');
+	}
+}
+$(function(){
+	
+	$('form').find(":input[name]").not(":button,:reset,:image,:submit").each(function(ndx, ele) {
+		$(this).attr('autocomplete','new-text');
+	});
+	
+	
+	$("#ywcbs").html($(".succ").length);
+	window.onscroll=function(){
+		var top1=document.documentElement.scrollTop;
+		if(top1>=300){
+			$(".pageScroll").css("position","absolute").css("top",top1-300);
+		}else{
+			$(".pageScroll").css("position","absolute").css("top",5); 
+		}
+	}
+	initSize();
+
+});
+
+
+function isOverlap(idOne,idTwo){
+    var objOne=$(idOne),
+        objTwo=$(idTwo),
+        offsetOne = objOne.offset(),
+        offsetTwo = objTwo.offset(),
+        leftOne=offsetOne.left,
+        leftTwo=offsetTwo.left,
+        widthOne = objOne.width(),
+        widthTwo = 200;
+    var leftTop = leftOne -( leftTwo+widthTwo);
+    return leftTop;
+}
+</script>
+        	</div>
+        	<div class="xs10" id="xsjbxx">
+	 
+
+
+<style>
+	#txbs{
+		color: #FF9500;
+		font-size: 16px;
+		ont-weight: 700;
+	}
+</style>
+<ul class="bread" style="font-size: 14px;">
+            <li><span class="Icon Icon-home"></span><a href="/sstm/index">首页</a></li>
+            <li>填写/修改申请信息&nbsp;&nbsp;<span id="txbs">已完成<span id="ywcbs"></span>步</span><span style="font-size: 16px;">&nbsp;（共13步）</span></li>
+</ul>
+      <div class="info-group info-sub-group" style="position: relative;margin-top: 5px;">
+        	基本信息 
+            		<a href="#" class="button bg-sub " style="" id="showinfo">显示敏感信息</a>
+            	
+        	<br>
+      </div>
+      <div class="table-responsive">
+      	<table class="table">
+      		<input type="text" value="" id="jbxxym" name="jbxxym" style="DISPLAY: none">
+      		<input type="hidden" value="刘智杰" id="username" name="username"/>
+      			<tr>
+					<td class="tdlabel"><b>报名号</b></td>
+					<td class="tdvalue">20273320502
+					</td>
+				</tr>
+      			
+				<tr>
+					<td class="tdlabel"><b>姓名<font color="red">*</font></b></td>
+					<td class="tdvalue"><input name="xm" class="input w4 required"
+						type="text" value="刘智杰" id="xm">&nbsp;字库中没有的汉字用大写汉语拼音字母代替，中间无空格&nbsp;
+					</td>
+				</tr>
+
+
+				<tr>
+					<td class="tdlabel"><b>姓名拼音<font color="red">*</font></b></td>
+					<td class="tdvalue"><input name="xmpy" type="text"
+						class="input w4 required" value="" id="xmpy">&nbsp;按紧左原则，字母间不加任何字符&nbsp;
+						&nbsp;<span id="xmpySpan" style="display: none;color: red"></span>
+					</td>
+				</tr>
+				
+				<tr>
+					<td class="tdlabel">
+						<b>证件类型</b>
+					</td>
+					<td class="tdvalue">
+						居民身份证
+					</td>
+				</tr>
+				
+				<tr>
+					<td class="tdlabel">
+						<b>证件号码</b>
+					</td>
+					<td class="tdvalue">
+						**************6016
+					</td>
+				</tr>
+				
+				<tr>
+					<td class="tdlabel">
+						<b>出生日期<font color="red">*</font></b>
+					</td>
+					<td class="tdvalue">
+						
+							
+								20050214
+							
+							
+						 
+					</td>
+				</tr>
+				
+				<tr>
+					<td class="tdlabel">
+						<b>民族<font color="red">*</font></b>
+					</td>
+					<td class="tdvalue">
+						<select name="mzm" id="mz" class="input w4 input-auto required" selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL216eHojMDg0MjUyZTgtZDMxZC00NmEzLTgyNTQtY2ZkMmJhODcwMzVk" val=""></select>
+					</td>
+				</tr>
+
+
+				<tr>
+					<td class="tdlabel"><b>性别<font color="red">*</font></b></td>
+					<td class="tdvalue" class="input w3 input-auto ">
+					
+						
+							男
+						
+						
+					 
+					
+					&nbsp;<span id="xbSpan" style="display: none;color: red"></span>
+					</td>
+					
+				</tr>
+				<tr>
+					<td class="tdlabel"><b>婚否<font color="red">*</font></b></td>
+					<td class="tdvalue" class="input  input-auto ">
+					<select
+						name="hfm" id="hfm" class="input w4 input-auto required"
+						selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL2h5emt4eiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_" val="">
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<td class="tdlabel"><b>政治面貌<font color="red">*</font></b></td>
+					<td class="tdvalue" class="input  input-auto ">
+					<select
+						name="zzmmm" id="zzmmm" class="input w4 input-auto required "
+						selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL3p6bW14eiMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_" val="">
+					</select> 
+					</td>
+				</tr>
+				
+				<tr>
+					<td class="tdlabel"><b>现役军人码<font color="red">*</font></b></td>
+					<td class="tdvalue" class="input  input-auto  ">
+					<select
+						name="xyjrm" id="xyjrm" class="input w4 input-auto required"
+						selecturl="/TXlIZWFydFdpbGxHb09uY29tbS9nZXRTZWxlY3REYXRhL3NmeHlqcnh6X2JzIzA4NDI1MmU4LWQzMWQtNDZhMy04MjU0LWNmZDJiYTg3MDM1ZA__" val="">
+					</select>
+					</td>
+				</tr>
+				
+				
+				<tr>
+					<td class="tdlabel">
+						<b>出生地<font color="red">*</font></b>
+					</td>
+					<td class="tdvalue">
+						<input type="hidden" id="csdm" name="csdm" value="">
+						<input type="hidden" id="csd" name="csd" value="">
+						<div class="input-group w4">
+							<input name="csdmmc" type="text" class="input ireadonly required" disabled="disabled" id="csdmmc" value=" ">
+							
+							<span class="addon" onclick="chooseArea('csdm','csd','csdmmc')">选择</span>
+							
+						</div>
+					</td>
+				</tr>
+				<tr>
+					<td class="tdlabel"><b>籍贯地<font color="red">*</font></b></td>
+					<td class="tdvalue"><input type="hidden" id="jgszdm" name="jgszdm" value="">
+					<input type="hidden" id="jgszd" name="jgszd" value="">
+						<div class="input-group w4">
+							<input name="jgdmmc" type="text" id="jgdmmc"
+								value=" " type="text"
+								class="input ireadonly required" disabled="disabled"> <span class="addon"
+								onclick="chooseArea('jgszdm','jgszd','jgdmmc')">选择</span>
+						</div>
+					</td>
+				</tr>
+				<tr>
+					<td class="tdlabel"><b>户口所在地<font color="red">*</font></b></td>
+					<td class="tdvalue"><input type="hidden" id="hkszdm" name="hkszdm" value="">
+					<input type="hidden" id="hkszd" name="hkszd" value="">
+						<div class="input-group w4">
+							<input name="hkszdmc" type="text" id="hkszdmc"
+								value=" " 
+								class="input ireadonly required" disabled="disabled"> <span class="addon"
+								onclick="chooseArea('hkszdm','hkszd','hkszdmc')">选择</span>
+						</div>
+					</td>
+					
+				</tr>
+				<tr>
+					<td class="tdlabel"><b>户口所在地详细地址<font color="red">*</font></b></td>
+					<td class="tdvalue"><input class="input w4 required" name="hkszdxxdz"
+						type="text" value="" id="hkszdxxdz">
+					</td>
+				</tr>
+				<tr>
+					<td class="tdlabel"><b>档案所在地<font color="red">*</font></b></td>
+					<td class="tdvalue"><input type="hidden" name="daszdm"
+						id="daszdm" value=""><input type="hidden" name="daszd"
+						id="daszd" value="">
+						<div class="input-group w4">
+							<input name="daszdmc" type="text" id="daszdmc"
+								value=" "
+								class="input ireadonly required" disabled="disabled"> <span class="addon"
+								onclick="chooseArea('daszdm','daszd','daszdmc')">选择</span>
+						</div>
+					</td>
+				</tr>
+
+				<tr>
+					<td class="tdlabel"><b>档案所在单位<font color="red">*</font></b></td>
+					<td class="tdvalue"><input class="input w4 required" name="daszdw" type="text"
+						value="" id="daszdw">
+					</td>
+				</tr>
+
+				<tr>
+					<td class="tdlabel"><b>档案所在单位地址<font color="red">*</font></b></td>
+					<td class="tdvalue"><input class="input w4 required" name="daszdwdz"
+						type="text" value="" id="daszdwdz">
+					</td>
+				</tr>
+				
+				<tr>
+					<td class="tdlabel"><b>档案所在单位邮政编码<font color="red">*</font></b></td>
+					<td class="tdvalue">
+					<input class="input w4 required number" minlength="6" maxlength="6" name="daszdwyzbm" type="text" value=""
+						 id="daszdwyzbm">
+					</td>
+				</tr>
+				<tr>
+				<td class="tdlabel">
+					<b>通迅地址<font color="red">*</font></b>
+				</td>
+				<td class="tdvalue">
+					<input name="txdz" class="input w4 required" type="text" value="" id="txdz">
+					&nbsp;请务必填写详细准确
+				</td>
+			</tr>
+			<tr>
+				<td class="tdlabel">
+					<b>通信地址邮政编码<font color="red">*</font></b>
+				</td>
+				<td class="tdvalue">
+					<input name="yzbm" class="input w4 required number" maxlength="6" maxlength="6" type="text" value="" id="yzbm">
+				</td>
+			</tr>
+			<tr>
+				<td class="tdlabel">
+					<b>固定电话</b>
+				</td>
+				<td class="tdvalue">
+					<input name="lxdh" class="input w4 " type="text" value="" id="lxdh">
+					&nbsp;(例:021-65644159)
+				</td>
+			</tr>
+			<tr>
+				<td class="tdlabel">
+					<b>移动电话<font color="red">*</font></b>
+				</td>
+				<td class="tdvalue">
+					<input type="hidden" id="oyddh" value="186****7598">
+           			 <input type="hidden" id="odzxx" value="">
+           			 <input type="hidden" id="olxdh" value="">
+					<input name="yddh" class="input w4 required"  type="text" value="186****7598" id="yddh">
+				</td>
+			</tr>
+			<tr>
+				<td class="tdlabel">
+					<b>考生电子邮箱<font color="red">*</font></b>
+				</td>
+				<td class="tdvalue">
+					<input type="text" id="dzxxOld" value="" style="DISPLAY: none">
+					<input name="dzxx" class="input w4 required " type="text" value="" id="dzxx">
+				</td>
+			</tr>
+			<tr>
+				<td class="tdlabel">
+					<b>备用信息</b>
+				</td>
+				<td class="tdvalue">
+					<input name="byxx1" class="input w4 " type="text" value="" id="byxx1">
+				</td>
+			</tr>
+			</table>
+      </div>	
+      </div>
+	</div>	
+</form>
+	<ul class="pager"> 
+			
+            <li><button  class="button bg-sub" id="nextStep">下一步</button> </li>
+     </ul>
+
+
+
+
+<script type="text/javascript">
+
+jQuery(function($) {
+	selectCombox('');
+	/* EasyCheck.msgs['zjhm'] = {
+			'[reg]': '请输入正确的身份证号'
+		}; */
+	
+	
+	
+	});
+	
+	
+	
+	
+	function jyxmpy(){
+		var xmpy=$("#xmpy").val();
+		if(xmpy.indexOf(" ")!=-1){
+			showmessage('error','姓名拼音中间不要出现空格！');
+			return false;
+		}
+		return true;
+	}
+	function jyxb(){
+		if($("#zjlx option:selected").text()=='居民身份证'){
+			 var zjhm=$("#zjhm").val();
+			 var xb=zjhm.substring(16,17);
+			 if((xb%2==0 && $("#xbm option:selected").text()=='男') ||
+					 (xb%2==1 && $("#xbm option:selected").text()=='女')){
+				$("#xbSpan").css('display','');
+				$("#xbSpan").html('请选择与身份证一致的性别！');
+				
+				 $("#xbm").focus(); 
+				 return false;
+			 }
+		}
+		$("#xbSpan").css('display','none');
+		$("#xbSpan").html('');
+		return true;
+	};
+	function jycsrq(){
+		if($("#zjlx option:selected").text()=='居民身份证'){
+			 var zjhm=$("#zjhm").val();
+			 var rq=zjhm.substring(6,14);
+			 /* if(rq!=$("#csrq").val()){
+				showmessage('error','请选择与身份证一致的出生日期！');
+				$("#csrq").focus();
+				 return false;
+			 } */
+		}
+		return true;
+	};
+	function jyzjhm(){
+		if($("#zjlx option:selected").text()=='居民身份证'){
+			var zjhm=$("#zjhm").val();
+			if(zjhm==$("#zjhmOld").val())
+				return true;
+			var res=/^(^[1-9]\d{7}((0\d)|(1[0-2]))(([0|1|2]\d)|3[0-1])\d{3}$)|(^[1-9]\d{5}[1-9]\d{3}((0\d)|(1[0-2]))(([0|1|2]\d)|3[0-1])((\d{4})|\d{3}[Xx])$)$/;
+			if(!res.test(zjhm)){
+				showmessage('error','请输入正确的身份证号！');
+				$("#zjhm").focus();
+				return false;
+			}
+		}
+		return true;
+	};
+	$("#zjhm").change(function(){
+		jyzjhm();
+	});
+	$("#xbm").change(function(){
+		jyxb();
+	});
+	$("#xmpy").change(function(){
+		jyxmpy();
+	});
+	$('#csrq').on('propertychange', function() {
+	});
+	
+	function yzkslxfs(){
+		var dh=$("#yddh").val();
+		if(dh!=$("#oyddh").val()){
+			reg=/^1(2|3|4|5|6|7|8|9)\d{9}$/;
+			if(!reg.test(dh)){
+				showmessage('error','请填写正确的手机号码！');
+				$("#yddh").focus();
+				return false;
+			}else{
+				/* var yddh = dh;
+    			var v = yddh.substring(0,3);
+    			if(v=='133'||v=='149'||v=='153'||v=='173'||v=='177'||v=='180'||v=='181'||v=='189'||v=='199'){
+    				showmessage('error','不支持电信手机号');
+    				return;
+    			} */
+			}
+		}
+		var yx=$("#dzxx").val()
+		if(yx!=$("#odzxx").val()){
+			var res=/^[A-Za-z\d]+([-_.][A-Za-z\d]+)*@([A-Za-z\d]+[-.])+[A-Za-z\d]{2,4}$/;
+			if(!res.test(yx)){
+				showmessage('error','请填写正确的电子邮箱！');
+				$("#dzxx").focus();
+				return false;
+			}
+		}
+		
+		
+		var lxdh=$("#lxdh").val();
+		if(lxdh!=$("#olxdh").val()){
+			reg=/^(\(\d{3,4}\)|\d{3,4}-|\s)?\d{7,14}$/;
+			if(!reg.test(lxdh)){
+				showmessage('error','请填写正确的固定电话！');
+				$("#lxdh").focus();
+				return false;
+			}
+		}
+		
+		return true;
+	}
+	
+	var errMsg="";
+	
+	$("#nextStep").click(function(){
+		errMsg=""
+		var result = EasyCheck.checkForm($("#step1Form"));
+		if(!jyxb()){
+			showmessage('error','请选择与身份证一致的性别！');
+			return;
+		}
+		if(!jyzjhm() || !jyxmpy() || !jycsrq()){
+			return;
+		}
+		if(!yzkslxfs()){
+			return false;
+		}
+		if( result){
+			$("#jbxxym").val('1');
+			fakeLoader(); 
+			$("#step1Form").ajaxSubmit({
+	  		 	type: 'post', // 提交方式 get/post
+	            url: '/sstm/TXlIZWFydFdpbGxHb09udG0vc2F2ZU5leHQvamJ4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_', // 需要提交的 url
+	          	success: function(data) { 
+	            	 $(".fakeloader").hide();
+	            	 if(data.code==200){
+	            		 window.location.href='/sstm/TXlIZWFydFdpbGxHb09udG0vanRjeSMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_';
+	            	 }else if(data.code==-300){
+	            		 showmessage('error','信息填写错误，请查看校验结果！');
+	            		 $("#errMsg").html(data.msg);
+	            		 $("#err").show();
+	            		 scrollToLocation();
+	            	}else{
+	            		 showmessage('error','保存失败！');
+	            	 }
+	            }
+	        });		
+		}
+		
+	});
+	
+	$("#showinfo").click(function(){
+		fakeLoader(); 
+		$.ajax({
+			type: "POST",
+			url: '/TXlIZWFydFdpbGxHb09uc3N0bS90bS9zaG93SW5mbyMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_',
+			async:false,
+			dataType: "json",
+			success:function(data,status,XHR){
+				 $(".fakeloader").hide();
+				if(data.code=='200'){
+					window.location.href="/sstm/TXlIZWFydFdpbGxHb09udG0vamJ4eCMwODQyNTJlOC1kMzFkLTQ2YTMtODI1NC1jZmQyYmE4NzAzNWQ_";
+				}
+			}});
+	});
+
+
+
+</script>
+    </section>
+    
+
+<div class="footer">
+    <span>中国科学技术大学研究生院 安徽省合肥市包河区金寨路96号</span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+</div>
+    <script type="text/javascript">
+    	var hostUrl = '';
+    </script>
+</body>
+<script type="text/javascript">
+	var hostUrl = '';
+	
+	var keepAliveUrl = hostUrl+"/noop/result";
+	keepAlive(3);
+
+	
+	//处理键盘事件 禁止后退键（Backspace）密码或单行、多行文本框除外
+   function banBackSpace(e){
+ var ev = e || window.event;
+ //各种浏览器下获取事件对象
+ var obj = ev.relatedTarget || ev.srcElement || ev.target ||ev.currentTarget;
+ //按下Backspace键
+ if(ev.keyCode == 8){
+ var tagName = obj.nodeName //标签名称
+ //如果标签不是input或者textarea则阻止Backspace
+ if(tagName!='INPUT' && tagName!='TEXTAREA'){
+  return stopIt(ev);
+ }
+ var tagType = obj.type.toUpperCase();//标签类型
+ //input标签除了下面几种类型，全部阻止Backspace
+ if(tagName=='INPUT' && (tagType!='TEXT' && tagType!='TEXTAREA' && tagType!='PASSWORD')){
+  return stopIt(ev);
+ }
+ //input或者textarea输入框如果不可编辑则阻止Backspace
+ if((tagName=='INPUT' || tagName=='TEXTAREA') && (obj.readOnly==true || obj.disabled ==true)){
+  return stopIt(ev);
+ }
+ }
+}
+function stopIt(ev){
+ if(ev.preventDefault ){
+ //preventDefault()方法阻止元素发生默认的行为
+ ev.preventDefault();
+ }
+ if(ev.returnValue){
+ //IE浏览器下用window.event.returnValue = false;实现阻止元素发生默认的行为
+ ev.returnValue = false;
+ }
+ return false;
+}
+
+	window.onload=function(){
+	    //禁止后退键 作用于Firefox、Opera
+	    document.onkeypress=banBackSpace;
+	    //禁止后退键  作用于IE、Chrome
+	    document.onkeydown=banBackSpace;
+	}
+	
+</script>
+</html>
