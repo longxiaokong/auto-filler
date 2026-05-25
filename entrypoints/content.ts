@@ -1,4 +1,5 @@
 interface FormField {
+  kind: 'text' | 'file';
   tag: string;
   type: string;
   name: string;
@@ -10,6 +11,11 @@ interface FormField {
   title: string;
   value: string;
   options: string[];
+  accept: string;
+  multiple: boolean;
+  fillMode: 'short' | 'long';
+  renderWidth: number;
+  renderHeight: number;
   context: string;
   html: string;
 }
@@ -19,10 +25,21 @@ interface FieldResult {
   field: FormField;
 }
 
-interface FillItem {
+interface TextFillItem {
+  kind?: 'text';
   index: number;
   value: string;
 }
+
+interface FileFillItem {
+  kind: 'file';
+  index: number;
+  fileName: string;
+  fileType: string;
+  fileBody: string;
+}
+
+type FillItem = TextFillItem | FileFillItem;
 
 interface FillResult {
   success: number;
@@ -80,6 +97,9 @@ const EDITABLE_SELECTOR = [
   '[role="combobox"]',
 ].join(',');
 
+const FILE_SELECTOR = 'input[type="file"]';
+const SCANNABLE_SELECTOR = `${EDITABLE_SELECTOR},${FILE_SELECTOR}`;
+
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
@@ -93,14 +113,14 @@ function isVisible(el: HTMLElement): boolean {
 }
 
 function isFillable(el: HTMLElement): boolean {
-  if (!el.matches(EDITABLE_SELECTOR)) return false;
+  if (!el.matches(SCANNABLE_SELECTOR)) return false;
   if ((el as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).disabled) return false;
-  if ((el as HTMLInputElement | HTMLTextAreaElement).readOnly) return false;
+  if (!(el instanceof HTMLInputElement && el.type === 'file') && (el as HTMLInputElement | HTMLTextAreaElement).readOnly) return false;
   return isVisible(el);
 }
 
 function countEditables(el: HTMLElement): number {
-  return Array.from(el.querySelectorAll<HTMLElement>(EDITABLE_SELECTOR)).filter(isFillable).length;
+  return Array.from(el.querySelectorAll<HTMLElement>(SCANNABLE_SELECTOR)).filter(isFillable).length;
 }
 
 // Walk up from the deepest editable node until the current container holds
@@ -133,11 +153,32 @@ function getOptions(el: HTMLElement): string[] {
 }
 
 function getCurrentValue(el: HTMLElement): string {
+  if (el instanceof HTMLInputElement && el.type === 'file') {
+    return Array.from(el.files ?? []).map((file) => file.name).join(', ');
+  }
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value;
   if (el instanceof HTMLSelectElement) {
     return normalizeText(el.selectedOptions[0]?.textContent ?? el.value);
   }
   return normalizeText(el.textContent ?? '');
+}
+
+function getRenderedSize(el: HTMLElement): { width: number; height: number } {
+  const rect = el.getBoundingClientRect();
+  return {
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  };
+}
+
+function classifyFillMode(el: HTMLElement, width: number, height: number): 'short' | 'long' {
+  if (el instanceof HTMLSelectElement) return 'short';
+  if (el instanceof HTMLInputElement && el.type !== 'file') return height >= 96 ? 'long' : 'short';
+  if (el instanceof HTMLInputElement && el.type === 'file') return 'short';
+
+  const area = width * height;
+  if (height >= 96 || area >= 32000) return 'long';
+  return 'short';
 }
 
 function findContextRoot(el: HTMLElement): HTMLElement {
@@ -164,7 +205,7 @@ function findNearbyText(el: HTMLElement, contextRoot: HTMLElement): string {
   let current: ChildNode | null = el.previousSibling;
 
   while (current) {
-    if (current instanceof HTMLElement && isFillable(current)) break;
+    if (current instanceof HTMLElement && current.matches(SCANNABLE_SELECTOR) && isFillable(current)) break;
     const text = normalizeText(current.textContent ?? '');
     if (text) parts.unshift(text);
     current = current.previousSibling;
@@ -172,7 +213,7 @@ function findNearbyText(el: HTMLElement, contextRoot: HTMLElement): string {
 
   current = el.nextSibling;
   while (current) {
-    if (current instanceof HTMLElement && isFillable(current)) break;
+    if (current instanceof HTMLElement && current.matches(SCANNABLE_SELECTOR) && isFillable(current)) break;
     const text = normalizeText(current.textContent ?? '');
     if (text) parts.push(text);
     current = current.nextSibling;
@@ -252,9 +293,12 @@ function findHint(el: HTMLElement, label: string, context: string): string {
 
 function extractField(el: HTMLElement): FormField {
   const tag = el.tagName.toLowerCase();
+  const isFile = el instanceof HTMLInputElement && el.type === 'file';
+  const renderedSize = getRenderedSize(el);
   const context = findContext(el);
   const label = findLabel(el);
   return {
+    kind: isFile ? 'file' : 'text',
     tag,
     type: (el as HTMLInputElement).type ?? tag,
     name: el.getAttribute('name') ?? '',
@@ -266,6 +310,11 @@ function extractField(el: HTMLElement): FormField {
     title: el.getAttribute('title') ?? '',
     value: getCurrentValue(el),
     options: getOptions(el),
+    accept: isFile ? el.accept : '',
+    multiple: isFile ? el.multiple : false,
+    fillMode: classifyFillMode(el, renderedSize.width, renderedSize.height),
+    renderWidth: renderedSize.width,
+    renderHeight: renderedSize.height,
     context,
     html: sanitizeHtml(getSemanticContainer(el)),
   };
@@ -274,7 +323,7 @@ function extractField(el: HTMLElement): FormField {
 function scanFields(): FieldResult[] {
   elementMap.clear();
 
-  const elements = document.querySelectorAll<HTMLElement>(EDITABLE_SELECTOR);
+  const elements = document.querySelectorAll<HTMLElement>(SCANNABLE_SELECTOR);
   const results: FieldResult[] = [];
   let index = 0;
 
@@ -289,11 +338,38 @@ function scanFields(): FieldResult[] {
   return results;
 }
 
+function isAcceptedFileType(accept: string, fileName: string, fileType: string): boolean {
+  const rules = accept
+    .split(',')
+    .map((rule) => rule.trim().toLowerCase())
+    .filter(Boolean);
+  if (rules.length === 0) return true;
+
+  const lowerName = fileName.toLowerCase();
+  const lowerType = fileType.toLowerCase();
+  return rules.some((rule) => {
+    if (rule === '*/*') return true;
+    if (rule.endsWith('/*')) return lowerType.startsWith(rule.slice(0, -1));
+    if (rule.startsWith('.')) return lowerName.endsWith(rule);
+    return lowerType === rule;
+  });
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 function fillFields(items: FillItem[]): FillResult {
   let success = 0;
   let failure = 0;
 
-  for (const { index, value } of items) {
+  for (const item of items) {
+    const { index } = item;
     const el = elementMap.get(index);
     if (!el) {
       failure++;
@@ -304,7 +380,25 @@ function fillFields(items: FillItem[]): FillResult {
       const tag = el.tagName.toLowerCase();
       const type = (el as HTMLInputElement).type;
 
-      if (type === 'radio') {
+      if (item.kind === 'file') {
+        if (!(el instanceof HTMLInputElement) || el.type !== 'file') {
+          failure++;
+          continue;
+        }
+        if (!isAcceptedFileType(el.accept, item.fileName, item.fileType)) {
+          failure++;
+          continue;
+        }
+
+        const file = new File([base64ToArrayBuffer(item.fileBody)], item.fileName, { type: item.fileType || 'application/octet-stream' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        el.files = dataTransfer.files;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        success++;
+      } else if (type === 'radio') {
+        const { value } = item;
         const input = el as HTMLInputElement;
         if (input.value === value) {
           input.checked = true;
@@ -312,11 +406,13 @@ function fillFields(items: FillItem[]): FillResult {
         }
         success++;
       } else if (type === 'checkbox') {
+        const { value } = item;
         const input = el as HTMLInputElement;
         input.checked = value === 'true' || value === '1' || value === input.value;
         input.dispatchEvent(new Event('change', { bubbles: true }));
         success++;
       } else if (tag === 'select') {
+        const { value } = item;
         const select = el as HTMLSelectElement;
         const option = Array.from(select.options).find(
           (opt) => opt.value === value || opt.textContent?.trim() === value,
@@ -329,6 +425,7 @@ function fillFields(items: FillItem[]): FillResult {
         select.dispatchEvent(new Event('change', { bubbles: true }));
         success++;
       } else if (tag === 'textarea' || tag === 'input') {
+        const { value } = item;
         const target = el as HTMLInputElement | HTMLTextAreaElement;
         // Use native setter to ensure React/Angular pick up the change
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
@@ -344,6 +441,7 @@ function fillFields(items: FillItem[]): FillResult {
         target.dispatchEvent(new Event('change', { bubbles: true }));
         success++;
       } else if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
+        const { value } = item;
         el.textContent = value;
         el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
