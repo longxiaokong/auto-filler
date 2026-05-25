@@ -1,8 +1,9 @@
 import { defineConfig } from 'wxt';
+import { resolve } from 'node:path';
 
 export default defineConfig({
   runner: {
-    chromiumProfile: '.chrome-profile',
+    chromiumProfile: resolve('.chrome-profile'),
   },
   manifest: {
     name: 'Auto Filler',
