@@ -1,5 +1,5 @@
-import { getApiConfig, isApiConfigured } from '@/utils/storage';
-import { getAllTextFields, hasTextFields } from '@/utils/db';
+import { getApiConfig, isApiConfigured, setApiConfig } from '@/utils/storage';
+import { getAllTextFields, hasTextFields, saveAllTextFields } from '@/utils/db';
 import { matchFields } from '@/utils/matcher';
 import type { MatchResult, FormFieldInfo } from '@/utils/matcher';
 
@@ -52,6 +52,10 @@ async function sendToContentScript<T>(tabId: number, message: unknown): Promise<
 }
 
 export default defineBackground(() => {
+  if (import.meta.env.DEV) {
+    seedDevData();
+  }
+
   chrome.runtime.onMessage.addListener((request: Request<MessageType>, _sender, sendResponse) => {
     handleMessage(request)
       .then(sendResponse)
@@ -60,6 +64,29 @@ export default defineBackground(() => {
     return true;
   });
 });
+
+async function seedDevData() {
+  const [hasFields, apiReady] = await Promise.all([
+    hasTextFields(),
+    isApiConfigured(),
+  ]);
+
+  if (!hasFields) {
+    await saveAllTextFields([
+      { key: '姓名', value: '刘智杰' },
+      { key: '手机号', value: '13810131217' },
+      { key: '地址', value: '安徽省合肥市包河区金寨路96号' },
+    ]);
+  }
+
+  if (!apiReady) {
+    await setApiConfig({
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: 'sk-87f5684509814e7393b0f523b286147d',
+      model: 'deepseek-chat',
+    });
+  }
+}
 
 async function handleMessage(request: Request<MessageType>): Promise<Response> {
   if (request.type === 'startScan') {
