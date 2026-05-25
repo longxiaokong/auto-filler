@@ -48,7 +48,15 @@ async function getCurrentTab(): Promise<chrome.tabs.Tab | undefined> {
 }
 
 async function sendToContentScript<T>(tabId: number, message: unknown): Promise<T> {
-  return chrome.tabs.sendMessage(tabId, message) as Promise<T>;
+  try {
+    return await chrome.tabs.sendMessage(tabId, message) as T;
+  } catch (err) {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content-scripts/content.js'],
+    });
+    return chrome.tabs.sendMessage(tabId, message) as Promise<T>;
+  }
 }
 
 export default defineBackground(() => {
@@ -118,7 +126,7 @@ async function handleScan(): Promise<Response> {
     return { ok: true, type: 'scan', total: 0, matched: 0, matches: [], fields: [] };
   }
 
-  const fieldInfos = scanResults.map((r) => r.field);
+  const fieldInfos = scanResults.map((r) => ({ ...r.field, index: r.index }));
 
   const [textFields, apiConfig] = await Promise.all([
     getAllTextFields(),

@@ -9,6 +9,9 @@ export interface FormFieldInfo {
   label: string;
   placeholder: string;
   ariaLabel: string;
+  title?: string;
+  value?: string;
+  options?: string[];
   context: string;
 }
 
@@ -23,8 +26,17 @@ function buildPrompt(fields: FormFieldInfo[], textFields: { key: string; value: 
 
   const fieldList = fields
     .map((f) => {
-      const context = f.context || [f.label, f.placeholder, f.ariaLabel, f.name, f.id].filter(Boolean).join(', ');
-      return `  [${f.index}] type=${f.type}, context="${context}"`;
+      const readable = [
+        f.label,
+        f.placeholder,
+        f.ariaLabel,
+        f.title,
+        f.context,
+      ].filter(Boolean).join(' | ');
+      const technical = [f.name && `name=${f.name}`, f.id && `id=${f.id}`].filter(Boolean).join(', ');
+      const options = f.options?.length ? `, options="${f.options.join(' / ')}"` : '';
+      const currentValue = f.value ? `, currentValue="${f.value}"` : '';
+      return `  [${f.index}] tag=${f.tag}, type=${f.type}, readable="${readable}"${options}${currentValue}${technical ? `, ${technical}` : ''}`;
     })
     .join('\n');
 
@@ -38,6 +50,7 @@ ${fieldList}
 
 ## 规则
 - 根据语义匹配，不要只看关键词。例如"请输入您的真实姓名"应匹配"姓名"
+- 优先依据 readable 中的可读文本和下拉选项理解字段含义；name/id 只是技术标识，含义不清时不要强行匹配
 - 只返回能明确匹配的字段，不确定的不要返回
 - 每个表单字段最多匹配一个用户字段
 

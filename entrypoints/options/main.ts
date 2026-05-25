@@ -1,7 +1,7 @@
 import { getApiConfig, setApiConfig } from '../../utils/storage';
 import { getAllTextFields, saveAllTextFields } from '../../utils/db';
 import type { TextField } from '../../utils/db';
-import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
+import { PROVIDER_PRESETS, getProviderById } from '../../utils/providers';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
 const pageContent = document.getElementById('pageContent')!;
@@ -76,13 +76,7 @@ function renderPlaceholderPage(title: string) {
 function renderProfilePage() {
   const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
 
-  // Default fields first, then custom fields
-  const infoFields = [
-    ...DEFAULT_FIELDS.map((f) => ({ key: f.key, label: f.label })),
-    ...textFields
-      .filter((f) => !DEFAULT_FIELD_KEYS.has(f.key))
-      .map((f) => ({ key: f.key, label: f.key })),
-  ];
+  const infoFields = DEFAULT_FIELDS.map((f) => ({ key: f.key, label: f.label }));
 
   const infoHtml = infoFields.map((f) => {
     const val = fieldMap[f.key] ?? '';
@@ -206,7 +200,6 @@ function renderProfilePage() {
 
 // ===== Settings Page =====
 function renderSettingsPage() {
-  const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
   const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '', providerId: '' };
 
   nextFieldId = 0;
@@ -363,17 +356,20 @@ function onModelSelectChange() {
 
 function createFieldRowHtml(key: string, value: string, locked = false): string {
   const id = nextFieldId++;
-  const keyInput = locked
-    ? `<input type="text" class="field-key" value="${escapeHtml(key)}" readonly />`
-    : `<input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />`;
-  const deleteBtn = locked
-    ? ''
-    : '<button class="btn-delete" title="删除">&times;</button>';
+  if (locked) {
+    const label = DEFAULT_FIELD_LABELS[key] ?? key;
+    return `
+      <div class="field-row field-row-locked" data-id="${id}" data-key="${escapeAttr(key)}">
+        <span class="field-key-label">${escapeHtml(label)}</span>
+        <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
+      </div>
+    `;
+  }
   return `
-    <div class="field-row${locked ? ' field-row-locked' : ''}" data-id="${id}">
-      ${keyInput}
+    <div class="field-row" data-id="${id}">
+      <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
       <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
-      ${deleteBtn}
+      <button class="btn-delete" title="删除">&times;</button>
     </div>
   `;
 }
@@ -397,11 +393,11 @@ async function saveSettings() {
   const fields: { key: string; value: string }[] = [];
   const seenKeys = new Set<string>();
 
-  // Collect default fields first (locked key inputs)
+  // Collect default fields first (locked rows with data-key)
   for (const df of DEFAULT_FIELDS) {
-    const row = document.querySelector<HTMLElement>(`.field-row-locked input.field-key[value="${escapeAttr(df.key)}"]`);
-    const fieldValue = row
-      ? ((row.closest('.field-row')?.querySelector('.field-value') as HTMLInputElement)?.value.trim() ?? '')
+    const lockedRow = document.querySelector<HTMLElement>(`.field-row-locked[data-key="${df.key}"]`);
+    const fieldValue = lockedRow
+      ? ((lockedRow.querySelector('.field-value') as HTMLInputElement)?.value.trim() ?? '')
       : '';
     fields.push({ key: df.key, value: fieldValue });
     seenKeys.add(df.key);
@@ -470,10 +466,37 @@ function escapeAttr(text: string): string {
 
 // ===== Init =====
 async function init() {
-  const [fields, apiConfig] = await Promise.all([
+  const [rawFields, apiConfig] = await Promise.all([
     getAllTextFields(),
     getApiConfig(),
   ]);
+  let fields = rawFields;
+
+  // Migrate old Chinese keys → new English keys
+  const KEY_MIGRATION: Record<string, string> = {
+    '姓名': 'name',
+    '手机号': 'phone',
+    '手机号码': 'phone',
+    '电话': 'phone',
+    '邮箱': 'email',
+    '电子邮件': 'email',
+    '地址': 'address',
+    '住址': 'address',
+    '家庭住址': 'address',
+  };
+  const mFieldMap = new Map<string, string>();
+  const migratedKeys = new Set<string>();
+  for (const f of fields) {
+    const targetKey = KEY_MIGRATION[f.key] ?? f.key;
+    if (!mFieldMap.has(targetKey) || (f.value && !mFieldMap.get(targetKey))) {
+      mFieldMap.set(targetKey, f.value);
+    }
+    if (KEY_MIGRATION[f.key]) migratedKeys.add(f.key);
+  }
+
+  if (migratedKeys.size > 0) {
+    fields = Array.from(mFieldMap, ([key, value]) => ({ key, value }));
+  }
 
   // Seed default fields if missing
   const existingKeys = new Set(fields.map((f) => f.key));
@@ -484,7 +507,7 @@ async function init() {
       needSave = true;
     }
   }
-  if (needSave) {
+  if (needSave || migratedKeys.size > 0) {
     await saveAllTextFields(fields);
   }
 

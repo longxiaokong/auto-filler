@@ -169,7 +169,7 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
 
 function getFieldLabel(field: FormFieldInfo | undefined, index: number): string {
   if (!field) return `字段 #${index}`;
-  return field.label || field.placeholder || field.name || field.ariaLabel || `字段 #${index}`;
+  return field.label || field.placeholder || field.ariaLabel || field.context || field.name || field.id || `字段 #${index}`;
 }
 
 function renderResult(scanResp: ScanResponse) {
@@ -351,6 +351,10 @@ function startFill() {
   chrome.runtime.sendMessage(
     { type: 'startFill', payload: { matches: selected } },
     (response: FillResponse | ErrorResponse) => {
+      if (chrome.runtime.lastError) {
+        renderFillResult(false, 0, 0, chrome.runtime.lastError.message);
+        return;
+      }
       if (!response?.ok) {
         renderFillResult(false, 0, 0, (response as ErrorResponse).error);
         return;
@@ -401,4 +405,7 @@ function renderFillResult(success: boolean, successCount: number, failureCount: 
   main.querySelector('.result-msg')!.appendChild(btn);
 }
 
-init();
+init().catch((err) => {
+  renderHeader();
+  showError(err instanceof Error ? err.message : '插件初始化失败');
+});
