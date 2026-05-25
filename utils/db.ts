@@ -21,27 +21,92 @@ export interface FileRecord {
   fileBody: Blob;
   fileSize: number;
   fileDescription: string;
+  categoryId: number;
   createdAt: number;
+  _confirmDelete?: boolean;
+}
+
+export interface Category {
+  id?: number;
+  name: string;
+  icon: string;
+  sortOrder: number;
+  isDefault: boolean;
+  _confirmDelete?: boolean;
 }
 
 const DB_NAME = 'autoFillerDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+
+const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
+  { name: '身份证明', icon: '/icons/id-card.svg', sortOrder: 0, isDefault: false },
+  { name: '学历证明', icon: '/icons/education.svg', sortOrder: 1, isDefault: false },
+  { name: '资格证书', icon: '/icons/certificate.svg', sortOrder: 2, isDefault: false },
+  { name: '个人照片', icon: '/icons/photo.svg', sortOrder: 3, isDefault: false },
+  { name: '未分类', icon: '/icons/folder.svg', sortOrder: 99, isDefault: true },
+];
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event: IDBVersionChangeEvent) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains('textFields')) {
-        db.createObjectStore('textFields', { keyPath: 'id', autoIncrement: true });
+      const oldVersion = event.oldVersion;
+
+      if (oldVersion < 1) {
+        if (!db.objectStoreNames.contains('textFields')) {
+          db.createObjectStore('textFields', { keyPath: 'id', autoIncrement: true });
+        }
       }
-      if (!db.objectStoreNames.contains('fileRecords')) {
-        const store = db.createObjectStore('fileRecords', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('fileType', 'fileType', { unique: false });
-        store.createIndex('createdAt', 'createdAt', { unique: false });
+      if (oldVersion < 2) {
+        if (!db.objectStoreNames.contains('fileRecords')) {
+          const store = db.createObjectStore('fileRecords', { keyPath: 'id', autoIncrement: true });
+          store.createIndex('fileType', 'fileType', { unique: false });
+          store.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('blockCategories')) {
+          db.createObjectStore('blockCategories', { keyPath: 'id', autoIncrement: true });
+        }
       }
-      if (!db.objectStoreNames.contains('blockCategories')) {
-        db.createObjectStore('blockCategories', { keyPath: 'id', autoIncrement: true });
+      if (oldVersion < 3) {
+        const catStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
+        catStore.createIndex('sortOrder', 'sortOrder', { unique: false });
+
+        // Add categoryId index to fileRecords
+        if (db.objectStoreNames.contains('fileRecords')) {
+          const fileStore = req.transaction!.objectStore('fileRecords');
+          if (!fileStore.indexNames.contains('categoryId')) {
+            fileStore.createIndex('categoryId', 'categoryId', { unique: false });
+          }
+        }
+
+        // Seed default categories and migrate existing fileRecords
+        const uncategorizedId = DEFAULT_CATEGORIES.findIndex(c => c.isDefault);
+        const uncategorized = DEFAULT_CATEGORIES[uncategorizedId];
+        const catAddReq = catStore.add(uncategorized);
+        catAddReq.onsuccess = () => {
+          const uncId = catAddReq.result as number;
+          // Seed the rest
+          DEFAULT_CATEGORIES.forEach((cat, i) => {
+            if (i !== uncategorizedId) catStore.add(cat);
+          });
+          // Migrate existing fileRecords: set categoryId to uncategorized
+          if (db.objectStoreNames.contains('fileRecords')) {
+            const fileStore = req.transaction!.objectStore('fileRecords');
+            const cursorReq = fileStore.openCursor();
+            cursorReq.onsuccess = () => {
+              const cursor = cursorReq.result;
+              if (cursor) {
+                const record = cursor.value;
+                if (!record.categoryId) {
+                  record.categoryId = uncId;
+                  cursor.update(record);
+                }
+                cursor.continue();
+              }
+            };
+          }
+        };
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -99,12 +164,34 @@ export async function getAllFileRecords(): Promise<FileRecord[]> {
   });
 }
 
+export async function getFileRecordsByCategory(categoryId: number): Promise<FileRecord[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('fileRecords', 'readonly');
+    const store = tx.objectStore('fileRecords');
+    const index = store.index('categoryId');
+    const req = index.getAll(categoryId);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function addFileRecord(record: Omit<FileRecord, 'id'>): Promise<number> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('fileRecords', 'readwrite');
     const req = tx.objectStore('fileRecords').add(record);
     req.onsuccess = () => resolve(req.result as number);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function updateFileRecord(record: FileRecord): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('fileRecords', 'readwrite');
+    const req = tx.objectStore('fileRecords').put(record);
+    req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
@@ -116,6 +203,27 @@ export async function deleteFileRecord(id: number): Promise<void> {
     const req = tx.objectStore('fileRecords').delete(id);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
+  });
+}
+
+export async function moveFileRecordsToCategory(fromCategoryId: number, toCategoryId: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('fileRecords', 'readwrite');
+    const store = tx.objectStore('fileRecords');
+    const index = store.index('categoryId');
+    const req = index.openCursor(fromCategoryId);
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (cursor) {
+        const record = cursor.value;
+        record.categoryId = toCategoryId;
+        cursor.update(record);
+        cursor.continue();
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
@@ -155,4 +263,66 @@ export async function deleteBlockCategory(id: number): Promise<void> {
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
+}
+
+// ── Categories ──
+
+export async function getAllCategories(): Promise<Category[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('categories', 'readonly');
+    const req = tx.objectStore('categories').getAll();
+    req.onsuccess = () => {
+      const cats = req.result as Category[];
+      cats.sort((a, b) => a.sortOrder - b.sortOrder);
+      resolve(cats);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function addCategory(category: Omit<Category, 'id'>): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('categories', 'readwrite');
+    const req = tx.objectStore('categories').add(category);
+    req.onsuccess = () => resolve(req.result as number);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function updateCategory(category: Category): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('categories', 'readwrite');
+    const req = tx.objectStore('categories').put(category);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('categories', 'readwrite');
+    const req = tx.objectStore('categories').delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getCategoryCount(): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('categories', 'readonly');
+    const req = tx.objectStore('categories').count();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getUncategorizedId(): Promise<number | null> {
+  const cats = await getAllCategories();
+  const unc = cats.find(c => c.isDefault);
+  return unc?.id ?? null;
 }
