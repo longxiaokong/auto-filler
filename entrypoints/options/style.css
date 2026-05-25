@@ -592,6 +592,23 @@ body {
   display: none !important;
 }
 
+/* ===== API Key hint ===== */
+.api-key-hint {
+  display: block;
+  font-size: 12px;
+  color: #667085;
+  margin-top: 4px;
+}
+
+.api-key-hint a {
+  color: #257FFD;
+  text-decoration: none;
+}
+
+.api-key-hint a:hover {
+  text-decoration: underline;
+}
+
 .settings-actions {
   display: flex;
   align-items: center;
