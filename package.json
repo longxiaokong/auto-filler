@@ -17,11 +17,13 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.1.42",
+    "marked": "^18.0.4",
+    "puppeteer": "^25.0.4",
     "typescript": "^5.9.3",
     "wxt": "^0.20.26"
   },
   "dependencies": {
-    "pinyin-pro": "^3.28.1",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "pinyin-pro": "^3.28.1"
   }
 }
