@@ -280,6 +280,14 @@ body {
   background: #FFFBEB;
 }
 
+.field-item.confidence-medium {
+  background: #FFFBEB;
+}
+
+.field-item.confidence-low {
+  background: #FEF2F2;
+}
+
 .field-item input[type="checkbox"] {
   accent-color: #257FFD;
   width: 16px;
@@ -325,9 +333,24 @@ body {
   color: #16A34A;
 }
 
+.status-tag.high {
+  background: #DCFCE7;
+  color: #16A34A;
+}
+
 .status-tag.pending {
   background: #FEF3C7;
   color: #D97706;
+}
+
+.status-tag.medium {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.status-tag.low {
+  background: #FEE2E2;
+  color: #DC2626;
 }
 
 .status-tag.unmatched {

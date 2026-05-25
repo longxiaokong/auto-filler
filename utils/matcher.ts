@@ -7,18 +7,27 @@ export interface FormFieldInfo {
   name: string;
   id: string;
   label: string;
+  hint?: string;
   placeholder: string;
   ariaLabel: string;
   title?: string;
   value?: string;
   options?: string[];
   context: string;
+  html?: string;
 }
 
 export interface MatchResult {
   index: number;
   fieldKey: string;
   value: string;
+  shortLabel: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+function truncateText(text: string, maxLength: number): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
 }
 
 function buildPrompt(fields: FormFieldInfo[], textFields: { key: string; value: string }[]): string {
@@ -26,17 +35,14 @@ function buildPrompt(fields: FormFieldInfo[], textFields: { key: string; value: 
 
   const fieldList = fields
     .map((f) => {
-      const readable = [
-        f.label,
-        f.placeholder,
-        f.ariaLabel,
-        f.title,
-        f.context,
-      ].filter(Boolean).join(' | ');
+      const label = truncateText(f.label || f.placeholder || f.ariaLabel || f.title || '', 40);
+      const hint = truncateText(f.hint || '', 80);
+      const context = truncateText(f.context || '', 120);
+      const html = truncateText(f.html || '', 500);
       const technical = [f.name && `name=${f.name}`, f.id && `id=${f.id}`].filter(Boolean).join(', ');
       const options = f.options?.length ? `, options="${f.options.join(' / ')}"` : '';
       const currentValue = f.value ? `, currentValue="${f.value}"` : '';
-      return `  [${f.index}] tag=${f.tag}, type=${f.type}, readable="${readable}"${options}${currentValue}${technical ? `, ${technical}` : ''}`;
+      return `  [${f.index}] tag=${f.tag}, type=${f.type}, label="${label}", hint="${hint}", context="${context}", html="${html}"${options}${currentValue}${technical ? `, ${technical}` : ''}`;
     })
     .join('\n');
 
@@ -49,18 +55,46 @@ ${availableKeys.join('\n')}
 ${fieldList}
 
 ## 规则
-- 根据语义匹配，不要只看关键词。例如"请输入您的真实姓名"应匹配"姓名"
-- 优先依据 readable 中的可读文本和下拉选项理解字段含义；name/id 只是技术标识，含义不清时不要强行匹配
-- 只返回能明确匹配的字段，不确定的不要返回
-- 每个表单字段最多匹配一个用户字段
+- 根据语义匹配，不要只看关键词。例如"请输入您的真实姓名"应匹配"姓名"。
+- 只能使用"用户个人信息"中已有的信息直接匹配或派生，不要凭空编造未提供的信息。
+- 需要重点做同义、格式和派生推理。例如用户只有中文姓名，网页字段是"姓名拼音 / name pinyin"，应返回姓名的拼音；"证件号码"可由"身份证号"匹配；"证件号码后四位"应返回身份证号后四位；"出生日期"可直接使用或从身份证号第 7-14 位派生；"手机号后四位"应返回手机号后四位；"邮箱前缀"应返回 @ 前面的部分；"省/市/区"应从地址或户籍地址中拆出对应部分。
+- 如果字段要求拼音，使用普通话汉语拼音，小写、无声调；如果页面暗示大写、空格或英文格式，可按页面要求调整。
+- 如果页面提示"字母间不加任何字符 / 中间无空格 / 紧左原则"，姓名拼音应去掉空格，例如"刘智杰"应填"liuzhijie"。
+- 通讯地址、通信地址可优先匹配"地址"；户口所在地详细地址、户籍地址可优先匹配"户籍地址"。
+- 民族、性别、婚否、政治面貌等下拉项应根据 options 中最接近的选项文本匹配，value 返回网页可接受的选项文本。
+- 优先依据 label、hint、html 中的当前字段行/局部容器理解字段含义；context 只是辅助信息；name/id 只是技术标识，含义不清时不要强行匹配
+- 每个表单字段最多匹配一个用户字段。无法推理出合理值时不要返回该字段。
+- 为每个返回项生成一个简短字段名 shortLabel，2 到 8 个中文字符或简短英文，不要直接复制很长的上下文。
+- confidence 只能是 high、medium、low：
+  - high：字段含义和取值都明确，几乎可直接填。
+  - medium：语义基本匹配，但有格式/派生推理或上下文略有歧义。
+  - low：可能匹配，但需要用户重点确认。
 
 ## 输出格式
 返回 JSON 数组，每个元素包含：
 - index: 表单字段的索引（数字）
 - fieldKey: 匹配的用户字段 key（字符串）
-- value: 对应的用户数据值（字符串）
+- value: 要填入网页表单的最终值（字符串，可为派生/格式化后的值）
+- shortLabel: 简短字段名（字符串）
+- confidence: "high" | "medium" | "low"
 
 只返回 JSON 数组，不要其他内容。如果没有任何匹配，返回空数组 []。`;
+}
+
+function normalizeConfidence(value: unknown): MatchResult['confidence'] {
+  return value === 'high' || value === 'medium' || value === 'low' ? value : 'medium';
+}
+
+function fallbackShortLabel(field: FormFieldInfo | undefined, fieldKey: string, index: number): string {
+  const raw =
+    field?.label ||
+    field?.placeholder ||
+    field?.ariaLabel ||
+    field?.title ||
+    fieldKey ||
+    `字段${index}`;
+  const compact = raw.replace(/\s+/g, '').replace(/[：:，,。；;|｜]/g, ' ');
+  return compact.slice(0, 12) || `字段${index}`;
 }
 
 export async function matchFields(
@@ -110,10 +144,18 @@ export async function matchFields(
   const jsonMatch = content.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error('Invalid LLM response format');
 
-  const results = JSON.parse(jsonMatch[0]) as MatchResult[];
+  const rawResults = JSON.parse(jsonMatch[0]) as Array<Partial<MatchResult>>;
+  const fieldByIndex = new Map(fields.map((f) => [f.index, f]));
+  const results: MatchResult[] = rawResults.map((r) => ({
+    index: Number(r.index),
+    fieldKey: String(r.fieldKey ?? ''),
+    value: String(r.value ?? ''),
+    shortLabel: String(r.shortLabel || fallbackShortLabel(fieldByIndex.get(Number(r.index)), String(r.fieldKey ?? ''), Number(r.index))),
+    confidence: normalizeConfidence(r.confidence),
+  }));
 
   console.group('%c📋 匹配结果', 'color:#ff9800;font-weight:bold');
-  results.forEach((r) => console.log(`  [${r.index}] "${r.fieldKey}" ← "${r.value}"`));
+  results.forEach((r) => console.log(`  [${r.index}] ${r.confidence} "${r.shortLabel}" "${r.fieldKey}" ← "${r.value}"`));
   console.groupEnd();
 
   const validIndices = new Set(fields.map((f) => f.index));
