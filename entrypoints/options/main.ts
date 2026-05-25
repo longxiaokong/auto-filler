@@ -352,8 +352,23 @@ function renderSettingsPage() {
   document.getElementById('saveBtn')?.addEventListener('click', saveSettings);
 }
 
-function getEl(id: string): HTMLInputElement | HTMLSelectElement {
-  return document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
+// ── Text Fields ──
+
+let textFields: { key: string; value: string }[] = [];
+let nextFieldId = 0;
+
+function createFieldRow(key: string, value: string): HTMLDivElement {
+  const id = nextFieldId++;
+  const row = document.createElement('div');
+  row.className = 'field-row';
+  row.dataset.id = String(id);
+  row.innerHTML = `
+    <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
+    <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
+    <button class="btn-delete" title="删除">×</button>
+  `;
+  row.querySelector('.btn-delete')!.addEventListener('click', () => row.remove());
+  return row;
 }
 
 function readSettingsFields(): ProfileFields {
@@ -385,6 +400,8 @@ async function saveSettings() {
 
   showStatus('已保存');
 }
+
+// ── API Config ──
 
 function showStatus(text: string) {
   const statusMsg = document.getElementById('statusMsg');

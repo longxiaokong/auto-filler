@@ -1,14 +1,9 @@
 import './style.css';
-import { getProfile, isProfileConfigured, isApiConfigured } from '@/utils/storage';
+import { isApiConfigured } from '@/utils/storage';
+import { hasTextFields } from '@/utils/db';
 import type { MatchResult, FormFieldInfo } from '@/utils/matcher';
 
 const app = document.getElementById('app')!;
-
-const PROFILE_TYPE_LABELS: Record<string, string> = {
-  general: '普通',
-  student: '学生',
-  civil_servant: '公务员',
-};
 
 interface ScanResponse {
   ok: true;
@@ -47,10 +42,9 @@ let displayItems: DisplayItem[] = [];
 let fields: FormFieldInfo[] = [];
 
 async function init() {
-  const [profileReady, apiReady, { profileType }] = await Promise.all([
-    isProfileConfigured(),
+  const [hasFields, apiReady] = await Promise.all([
+    hasTextFields(),
     isApiConfigured(),
-    getProfile(),
   ]);
 
   renderHeader(profileType);
@@ -63,7 +57,7 @@ async function init() {
   renderIdle();
 }
 
-function renderHeader(profileType: string) {
+function renderHeader() {
   const header = document.createElement('div');
   header.className = 'header';
   header.innerHTML = `

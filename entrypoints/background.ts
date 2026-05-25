@@ -1,7 +1,7 @@
-import { getProfile, getApiConfig, isProfileConfigured, isApiConfigured } from '@/utils/storage';
+import { getApiConfig, isApiConfigured } from '@/utils/storage';
+import { getAllTextFields, hasTextFields } from '@/utils/db';
 import { matchFields } from '@/utils/matcher';
-import type { MatchResult } from '@/utils/matcher';
-import type { FormFieldInfo } from '@/utils/matcher';
+import type { MatchResult, FormFieldInfo } from '@/utils/matcher';
 
 interface MessageMap {
   startScan: undefined;
@@ -57,7 +57,7 @@ export default defineBackground(() => {
       .then(sendResponse)
       .catch((err) => sendResponse(errorResponse(err.message)));
 
-    return true; // keep channel open for async
+    return true;
   });
 });
 
@@ -75,15 +75,14 @@ async function handleScan(): Promise<Response> {
   const tab = await getCurrentTab();
   if (!tab?.id) return errorResponse('No active tab found');
 
-  const [profileReady, apiReady] = await Promise.all([
-    isProfileConfigured(),
+  const [hasFields, apiReady] = await Promise.all([
+    hasTextFields(),
     isApiConfigured(),
   ]);
 
-  if (!profileReady) return errorResponse('请先在设置页录入个人信息');
+  if (!hasFields) return errorResponse('请先在设置页录入个人信息');
   if (!apiReady) return errorResponse('请先在设置页配置 API Key');
 
-  // 1. Ask content script to scan fields
   const scanResults = await sendToContentScript<
     Array<{ index: number; field: FormFieldInfo }>
   >(tab.id, { type: 'scan' });
@@ -94,11 +93,12 @@ async function handleScan(): Promise<Response> {
 
   const fieldInfos = scanResults.map((r) => r.field);
 
-  // 2. Run LLM matching
-  const { profileType, fields: profileFields } = await getProfile();
-  const apiConfig = await getApiConfig();
+  const [textFields, apiConfig] = await Promise.all([
+    getAllTextFields(),
+    getApiConfig(),
+  ]);
 
-  const matches = await matchFields(fieldInfos, apiConfig, profileType, profileFields);
+  const matches = await matchFields(fieldInfos, apiConfig, textFields);
 
   return {
     ok: true,
