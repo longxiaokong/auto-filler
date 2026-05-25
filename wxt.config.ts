@@ -1,10 +1,6 @@
 import { defineConfig } from 'wxt';
-import { resolve } from 'node:path';
 
 export default defineConfig({
-  runner: {
-    chromiumProfile: resolve('.chrome-profile'),
-  },
   manifest: {
     name: 'Auto Filler',
     permissions: ['storage', 'activeTab', 'scripting'],
