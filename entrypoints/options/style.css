@@ -923,13 +923,14 @@ body {
 
 .field-row-locked .field-key {
   background: #F9FAFB;
-  color: #667085;
-  cursor: default;
+
 }
 
-.field-row-locked .field-key:focus {
-  border-color: #E5EAF2;
-  box-shadow: none;
+.field-row-locked .field-key-label {
+  flex: 2;
+  font-size: 14px;
+  color: #667085;
+  padding: 9px 12px;
 }
 
 /* ===== Scrollbar ===== */
