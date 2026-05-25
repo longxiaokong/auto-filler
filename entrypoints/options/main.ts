@@ -1,13 +1,7 @@
 import { getApiConfig, setApiConfig } from '../../utils/storage';
-<<<<<<< HEAD
 import { getAllTextFields, saveAllTextFields, getAllBlockCategories, saveBlockCategory, deleteBlockCategory } from '../../utils/db';
 import type { TextField, BlockCategory, BlockItem } from '../../utils/db';
 import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
-=======
-import { getAllTextFields, saveAllTextFields } from '../../utils/db';
-import type { TextField } from '../../utils/db';
-import { PROVIDER_PRESETS, getProviderById } from '../../utils/providers';
->>>>>>> 58784e1c0e7a5502f1cf309057b4c76fdc62c358
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
 const pageContent = document.getElementById('pageContent')!;
@@ -680,11 +674,7 @@ function escapeAttr(text: string): string {
 
 // ===== Init =====
 async function init() {
-<<<<<<< HEAD
-  const [fields, apiConfig, blocks] = await Promise.all([
-=======
-  const [rawFields, apiConfig] = await Promise.all([
->>>>>>> 58784e1c0e7a5502f1cf309057b4c76fdc62c358
+  const [rawFields, apiConfig, blocks] = await Promise.all([
     getAllTextFields(),
     getApiConfig(),
     getAllBlockCategories(),
