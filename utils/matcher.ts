@@ -61,6 +61,12 @@ export async function matchFields(
   const baseUrl = apiConfig.baseUrl.replace(/\/+$/, '');
   const url = `${baseUrl}/chat/completions`;
 
+  console.group('%c🔍 LLM 匹配请求', 'color:#1E88E5;font-weight:bold');
+  console.log('%cAPI:', 'color:#888', url);
+  console.log('%cModel:', 'color:#888', apiConfig.model || 'gpt-4o-mini');
+  console.log('%cPrompt:\n' + prompt, 'color:#333');
+  console.groupEnd();
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -83,10 +89,19 @@ export async function matchFields(
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('Empty response from LLM');
 
+  console.group('%c✅ LLM 匹配响应', 'color:#4caf50;font-weight:bold');
+  console.log('%cRaw:', 'color:#888', content);
+  console.log('%cTokens usage:', 'color:#888', JSON.stringify(data.usage));
+  console.groupEnd();
+
   const jsonMatch = content.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error('Invalid LLM response format');
 
   const results = JSON.parse(jsonMatch[0]) as MatchResult[];
+
+  console.group('%c📋 匹配结果', 'color:#ff9800;font-weight:bold');
+  results.forEach((r) => console.log(`  [${r.index}] "${r.fieldKey}" ← "${r.value}"`));
+  console.groupEnd();
 
   const validIndices = new Set(fields.map((f) => f.index));
   return results.filter((r) => validIndices.has(r.index) && r.fieldKey && r.value);

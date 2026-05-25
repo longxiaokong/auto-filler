@@ -8,6 +8,17 @@ const pageContent = document.getElementById('pageContent')!;
 const pageTitle = document.getElementById('pageTitle')!;
 const pageSubtitle = document.getElementById('pageSubtitle')!;
 
+const DEFAULT_FIELDS: { key: string; label: string }[] = [
+  { key: 'name', label: '姓名' },
+  { key: 'phone', label: '手机号' },
+  { key: 'email', label: '邮箱' },
+  { key: 'address', label: '住址' },
+];
+const DEFAULT_FIELD_KEYS = new Set(DEFAULT_FIELDS.map((f) => f.key));
+const DEFAULT_FIELD_LABELS: Record<string, string> = Object.fromEntries(
+  DEFAULT_FIELDS.map((f) => [f.key, f.label]),
+);
+
 const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
   home: { title: '首页', subtitle: '概览与快捷入口' },
   profile: { title: '个人信息与材料管理', subtitle: '完善个人信息与材料库，提升填表效率与准确性' },
@@ -65,13 +76,12 @@ function renderPlaceholderPage(title: string) {
 function renderProfilePage() {
   const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
 
+  // Default fields first, then custom fields
   const infoFields = [
-    { key: 'name', label: '姓名' },
-    { key: 'phone', label: '手机号' },
-    { key: 'email', label: '邮箱' },
-    { key: 'school', label: '学校' },
-    { key: 'major', label: '专业' },
-    { key: 'gpa', label: '学分绩' },
+    ...DEFAULT_FIELDS.map((f) => ({ key: f.key, label: f.label })),
+    ...textFields
+      .filter((f) => !DEFAULT_FIELD_KEYS.has(f.key))
+      .map((f) => ({ key: f.key, label: f.key })),
   ];
 
   const infoHtml = infoFields.map((f) => {
@@ -200,13 +210,20 @@ function renderSettingsPage() {
   const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '', providerId: '' };
 
   nextFieldId = 0;
-  const fieldRowsHtml = textFields.map((f) => createFieldRowHtml(f.key, f.value)).join('');
+  const settingsFieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
+
+  const defaultFieldRows = DEFAULT_FIELDS.map((df) => {
+    return createFieldRowHtml(df.key, settingsFieldMap[df.key] ?? '', true);
+  }).join('');
+
+  const customFields = textFields.filter((f) => !DEFAULT_FIELD_KEYS.has(f.key));
+  const customFieldRows = customFields.map((f) => createFieldRowHtml(f.key, f.value, false)).join('');
 
   pageContent.innerHTML = `
     <div class="settings-form">
       <div class="settings-section">
         <h2>个人信息</h2>
-        <div id="fieldList">${fieldRowsHtml}</div>
+        <div id="fieldList">${defaultFieldRows}${customFieldRows}</div>
         <button class="add-btn" id="addFieldBtn">+ 添加字段</button>
       </div>
 
@@ -344,13 +361,19 @@ function onModelSelectChange() {
   }
 }
 
-function createFieldRowHtml(key: string, value: string): string {
+function createFieldRowHtml(key: string, value: string, locked = false): string {
   const id = nextFieldId++;
+  const keyInput = locked
+    ? `<input type="text" class="field-key" value="${escapeHtml(key)}" readonly />`
+    : `<input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />`;
+  const deleteBtn = locked
+    ? ''
+    : '<button class="btn-delete" title="删除">&times;</button>';
   return `
-    <div class="field-row" data-id="${id}">
-      <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
+    <div class="field-row${locked ? ' field-row-locked' : ''}" data-id="${id}">
+      ${keyInput}
       <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
-      <button class="btn-delete" title="删除">&times;</button>
+      ${deleteBtn}
     </div>
   `;
 }
@@ -372,10 +395,24 @@ function createFieldRowEl(key: string, value: string): HTMLDivElement {
 async function saveSettings() {
   const rows = document.querySelectorAll<HTMLElement>('.field-row');
   const fields: { key: string; value: string }[] = [];
+  const seenKeys = new Set<string>();
+
+  // Collect default fields first (locked key inputs)
+  for (const df of DEFAULT_FIELDS) {
+    const row = document.querySelector<HTMLElement>(`.field-row-locked input.field-key[value="${escapeAttr(df.key)}"]`);
+    const fieldValue = row
+      ? ((row.closest('.field-row')?.querySelector('.field-value') as HTMLInputElement)?.value.trim() ?? '')
+      : '';
+    fields.push({ key: df.key, value: fieldValue });
+    seenKeys.add(df.key);
+  }
+
   rows.forEach((row) => {
     const key = (row.querySelector('.field-key') as HTMLInputElement)?.value.trim() ?? '';
+    if (!key || seenKeys.has(key)) return;
     const value = (row.querySelector('.field-value') as HTMLInputElement)?.value.trim() ?? '';
-    if (key) fields.push({ key, value });
+    fields.push({ key, value });
+    seenKeys.add(key);
   });
 
   await saveAllTextFields(fields);
@@ -437,6 +474,19 @@ async function init() {
     getAllTextFields(),
     getApiConfig(),
   ]);
+
+  // Seed default fields if missing
+  const existingKeys = new Set(fields.map((f) => f.key));
+  let needSave = false;
+  for (const df of DEFAULT_FIELDS) {
+    if (!existingKeys.has(df.key)) {
+      fields.push({ key: df.key, value: '' });
+      needSave = true;
+    }
+  }
+  if (needSave) {
+    await saveAllTextFields(fields);
+  }
 
   textFields = fields;
   apiConfigData = apiConfig;
