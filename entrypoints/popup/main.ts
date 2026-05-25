@@ -1,14 +1,9 @@
 import './style.css';
-import { getProfile, isProfileConfigured, isApiConfigured } from '@/utils/storage';
+import { isApiConfigured } from '@/utils/storage';
+import { hasTextFields } from '@/utils/db';
 import type { MatchResult, FormFieldInfo } from '@/utils/matcher';
 
 const app = document.getElementById('app')!;
-
-const PROFILE_TYPE_LABELS: Record<string, string> = {
-  general: '普通',
-  student: '学生',
-  civil_servant: '公务员',
-};
 
 interface ScanResponse {
   ok: true;
@@ -31,31 +26,28 @@ interface FillResponse {
   failure: number;
 }
 
-// State
 let matches: MatchResult[] = [];
 let fields: FormFieldInfo[] = [];
 let selectedIndices = new Set<number>();
 
 async function init() {
-  const [profileReady, apiReady, { profileType }] = await Promise.all([
-    isProfileConfigured(),
+  const [hasFields, apiReady] = await Promise.all([
+    hasTextFields(),
     isApiConfigured(),
-    getProfile(),
   ]);
 
-  renderHeader(profileType);
-  renderMain(profileReady, apiReady);
+  renderHeader();
+  renderMain(hasFields, apiReady);
 }
 
-function renderHeader(profileType: string) {
+function renderHeader() {
   const header = document.createElement('div');
   header.className = 'header';
   header.innerHTML = `
     <div class="header-left">
-      <span class="logo">⚡ Auto Filler</span>
+      <span class="logo">Auto Filler</span>
     </div>
     <div class="header-right">
-      <span class="badge">${PROFILE_TYPE_LABELS[profileType] || profileType}</span>
       <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
     </div>
   `;
@@ -66,14 +58,14 @@ function renderHeader(profileType: string) {
   });
 }
 
-function renderMain(profileReady: boolean, apiReady: boolean) {
+function renderMain(hasFields: boolean, apiReady: boolean) {
   const main = document.createElement('div');
   main.className = 'main';
 
-  if (!profileReady || !apiReady) {
+  if (!hasFields || !apiReady) {
     main.innerHTML = `
       <div class="not-configured">
-        <p>${!profileReady ? '请先在设置页录入个人信息' : '请先在设置页配置 API Key'}</p>
+        <p>${!hasFields ? '请先在设置页录入个人信息' : '请先在设置页配置 API Key'}</p>
         <span class="settings-link" id="goSettings">前往设置</span>
       </div>
     `;
@@ -86,7 +78,7 @@ function renderMain(profileReady: boolean, apiReady: boolean) {
 
   const btn = document.createElement('button');
   btn.className = 'scan-btn';
-  btn.textContent = '🔍 扫描当前页面';
+  btn.textContent = '扫描当前页面';
   btn.addEventListener('click', startScan);
   main.appendChild(btn);
   app.appendChild(main);
@@ -122,7 +114,7 @@ function showError(main: HTMLElement, message: string) {
   main.innerHTML = `
     <div class="error">
       <div class="error-text">${message}</div>
-      <button class="scan-btn" id="retryBtn">🔍 重新扫描</button>
+      <button class="scan-btn" id="retryBtn">重新扫描</button>
     </div>
   `;
   document.getElementById('retryBtn')!.addEventListener('click', startScan);
@@ -139,7 +131,7 @@ function renderResult(main: HTMLElement, scanResp: ScanResponse) {
   main.innerHTML = `
     <div class="result-header">识别到 ${scanResp.total} 个表单字段（匹配 ${scanResp.matched} 个）</div>
     <ul class="field-list" id="fieldList"></ul>
-    <button class="fill-btn" id="fillBtn">⚡ 确认一键填充</button>
+    <button class="fill-btn" id="fillBtn">确认填充</button>
   `;
 
   const list = document.getElementById('fieldList')!;
