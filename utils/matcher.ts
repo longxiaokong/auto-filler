@@ -194,3 +194,351 @@ export async function matchFields(
   const validIndices = new Set(textLikeFields.map((f) => f.index));
   return results.filter((r) => validIndices.has(r.index) && r.fieldKey && r.value);
 }
+
+// ─── Streaming parser ───────────────────────────────────────────────
+
+export type ParserEvent =
+  | { type: 'value_chunk'; index: number; chunk: string }
+  | { type: 'match_complete'; match: MatchResult };
+
+class IncrementalJsonParser {
+  private buf = '';
+  private pos = 0;
+  private depth = 0;
+  private inString = false;
+  private esc = false;
+
+  // Per-object state (reset on each top-level '{')
+  private readingKey = false;
+  private readingVal = false;
+  private readingNum = false;
+  private keyBuf = '';
+  private valBuf = '';
+  private numBuf = '';
+  private curKey = '';
+  private curIndex = -1;
+  private isLong = false;
+  private objStart = -1;
+  private afterColon = false;
+
+  // Long-text chunking
+  private chunkBuf = '';
+
+  // Unicode escape state
+  private uniMode = false;
+  private uniBuf = '';
+  private uniCount = 0;
+
+  private readonly fieldByIndex: Map<number, FormFieldInfo>;
+
+  constructor(fields: FormFieldInfo[]) {
+    this.fieldByIndex = new Map(fields.map((f) => [f.index, f]));
+  }
+
+  feed(chunk: string): ParserEvent[] {
+    const events: ParserEvent[] = [];
+    this.buf += chunk;
+
+    while (this.pos < this.buf.length) {
+      const ch = this.buf[this.pos];
+      this.pos++;
+
+      // ── unicode escape ──
+      if (this.uniMode) {
+        this.uniBuf += ch;
+        if (++this.uniCount === 4) {
+          this.uniMode = false;
+          this.appendChar(String.fromCharCode(parseInt(this.uniBuf, 16)), events);
+        }
+        continue;
+      }
+
+      // ── escape sequence ──
+      if (this.esc) {
+        this.esc = false;
+        switch (ch) {
+          case '"': this.appendChar('"', events); break;
+          case '\\': this.appendChar('\\', events); break;
+          case 'n': this.appendChar('\n', events); break;
+          case 't': this.appendChar('\t', events); break;
+          case 'r': this.appendChar('\r', events); break;
+          case 'u': this.uniMode = true; this.uniBuf = ''; this.uniCount = 0; break;
+          default: break;
+        }
+        continue;
+      }
+
+      // ── backslash ──
+      if (this.inString && ch === '\\') {
+        this.esc = true;
+        continue;
+      }
+
+      // ── string boundary ──
+      if (ch === '"') {
+        this.inString = !this.inString;
+        if (this.inString) {
+          if (this.depth >= 2 && this.afterColon && this.curKey) {
+            this.readingVal = true;
+            this.valBuf = '';
+            this.chunkBuf = '';
+            this.afterColon = false;
+          } else if (this.depth >= 2 && !this.readingKey && !this.readingVal && !this.readingNum && !this.curKey) {
+            this.readingKey = true;
+            this.keyBuf = '';
+          }
+        } else {
+          if (this.readingKey) {
+            this.curKey = this.keyBuf;
+            this.readingKey = false;
+          } else if (this.readingVal) {
+            this.finishValue(events);
+            this.readingVal = false;
+            this.curKey = '';
+          }
+        }
+        continue;
+      }
+
+      // ── inside string: accumulate ──
+      if (this.inString) {
+        this.appendChar(ch, events);
+        continue;
+      }
+
+      // ── outside string: structural characters ──
+      if (ch === '[') {
+        this.depth++;
+        continue;
+      }
+
+      if (ch === ']') {
+        this.depth--;
+        continue;
+      }
+
+      if (ch === '{') {
+        this.depth++;
+        if (this.depth === 2) {
+          this.objStart = this.pos - 1;
+          this.resetObject();
+        }
+        continue;
+      }
+
+      if (ch === '}') {
+        if (this.readingNum) this.finishNumber();
+        if (this.depth === 2) this.tryCompleteObject(events);
+        this.depth--;
+        continue;
+      }
+
+      if (ch === ':') {
+        this.afterColon = true;
+        continue;
+      }
+
+      if (ch === ',') {
+        if (this.readingNum) this.finishNumber();
+        this.readingKey = false;
+        this.readingVal = false;
+        this.readingNum = false;
+        this.curKey = '';
+        continue;
+      }
+
+      // ── number value ──
+      if (this.afterColon && /[\d\-]/.test(ch)) {
+        this.readingNum = true;
+        this.numBuf = ch;
+        this.afterColon = false;
+        continue;
+      }
+      if (this.readingNum && /[\d.eE+\-]/.test(ch)) {
+        this.numBuf += ch;
+        continue;
+      }
+      if (this.readingNum) {
+        this.finishNumber();
+      }
+
+      // Skip whitespace and other chars
+    }
+
+    return events;
+  }
+
+  finalize(): ParserEvent[] {
+    const events: ParserEvent[] = [];
+    // Flush remaining long-text chunk
+    if (this.isLong && this.chunkBuf.length > 0) {
+      events.push({ type: 'value_chunk', index: this.curIndex, chunk: this.chunkBuf });
+      this.chunkBuf = '';
+    }
+    // Try to complete a partial object
+    if (this.depth === 2) {
+      this.tryCompleteObject(events);
+    }
+    return events;
+  }
+
+  private appendChar(ch: string, events: ParserEvent[]): void {
+    if (this.readingKey) {
+      this.keyBuf += ch;
+    } else if (this.readingVal) {
+      this.valBuf += ch;
+      if (this.curKey === 'value' && this.isLong) {
+        this.chunkBuf += ch;
+        if (this.chunkBuf.length >= 5) {
+          events.push({ type: 'value_chunk', index: this.curIndex, chunk: this.chunkBuf });
+          this.chunkBuf = '';
+        }
+      }
+    }
+  }
+
+  private finishValue(events: ParserEvent[]): void {
+    if (this.curKey === 'index') {
+      this.curIndex = parseInt(this.valBuf, 10) || -1;
+      const field = this.fieldByIndex.get(this.curIndex);
+      this.isLong = field?.fillMode === 'long';
+    } else if (this.curKey === 'value' && this.isLong && this.chunkBuf.length > 0) {
+      events.push({ type: 'value_chunk', index: this.curIndex, chunk: this.chunkBuf });
+      this.chunkBuf = '';
+    }
+  }
+
+  private finishNumber(): void {
+    if (this.curKey === 'index') {
+      this.curIndex = parseInt(this.numBuf, 10) || -1;
+      const field = this.fieldByIndex.get(this.curIndex);
+      this.isLong = field?.fillMode === 'long';
+    }
+    this.readingNum = false;
+  }
+
+  private resetObject(): void {
+    this.readingKey = false;
+    this.readingVal = false;
+    this.readingNum = false;
+    this.curKey = '';
+    this.curIndex = -1;
+    this.isLong = false;
+    this.keyBuf = '';
+    this.valBuf = '';
+    this.numBuf = '';
+    this.chunkBuf = '';
+    this.afterColon = false;
+  }
+
+  private tryCompleteObject(events: ParserEvent[]): void {
+    try {
+      const json = this.buf.substring(this.objStart, this.pos);
+      const raw = JSON.parse(json) as Partial<MatchResult>;
+      const index = Number(raw.index);
+      const field = this.fieldByIndex.get(index);
+      const isLongField = field?.fillMode === 'long';
+      events.push({
+        type: 'match_complete',
+        match: {
+          kind: 'text',
+          index,
+          fieldKey: String(raw.fieldKey ?? ''),
+          value: String(raw.value ?? ''),
+          shortLabel: String(raw.shortLabel || fallbackShortLabel(field, String(raw.fieldKey ?? ''), index)),
+          confidence: isLongField ? 'high' : normalizeConfidence(raw.confidence),
+          fillMode: field?.fillMode,
+        },
+      });
+    } catch {
+      // incomplete object, will retry on next feed or finalize
+    }
+  }
+}
+
+export async function* matchFieldsStream(
+  fields: FormFieldInfo[],
+  apiConfig: ApiConfig,
+  textFields: { key: string; value: string }[],
+): AsyncGenerator<ParserEvent> {
+  if (fields.length === 0 || textFields.length === 0) return;
+
+  const textLikeFields = fields.filter((f) => f.kind !== 'file');
+  if (textLikeFields.length === 0) return;
+
+  const prompt = buildPrompt(textLikeFields, textFields);
+  const baseUrl = apiConfig.baseUrl.replace(/\/+$/, '');
+  const url = `${baseUrl}/chat/completions`;
+
+  console.group('%c🔍 LLM 流式匹配请求', 'color:#1E88E5;font-weight:bold');
+  console.log('%cAPI:', 'color:#888', url);
+  console.log('%cModel:', 'color:#888', apiConfig.model || 'gpt-4o-mini');
+  console.groupEnd();
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiConfig.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: apiConfig.model || 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`LLM API error ${response.status}: ${text}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Stream reader not available');
+
+  const decoder = new TextDecoder();
+  const parser = new IncrementalJsonParser(textLikeFields);
+  let partialLine = '';
+  let done = false;
+
+  try {
+    while (!done) {
+      const result = await reader.read();
+      if (result.done) break;
+
+      const text = partialLine + decoder.decode(result.value, { stream: true });
+      const lines = text.split('\n');
+      partialLine = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        const payload = trimmed.slice(6);
+        if (payload === '[DONE]') { done = true; break; }
+
+        try {
+          const parsed = JSON.parse(payload);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            for (const event of parser.feed(content)) {
+              yield event;
+            }
+          }
+        } catch {
+          // skip malformed SSE payloads
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  // Flush remaining content
+  for (const event of parser.finalize()) {
+    yield event;
+  }
+
+  console.group('%c✅ LLM 流式匹配完成', 'color:#4caf50;font-weight:bold');
+  console.groupEnd();
+}

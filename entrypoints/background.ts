@@ -5,7 +5,7 @@ import {
   getAllTextFields,
   saveAllTextFields,
 } from '@/utils/db';
-import { matchFields } from '@/utils/matcher';
+import { matchFields, matchFieldsStream } from '@/utils/matcher';
 import type { Category, FileRecord } from '@/utils/db';
 import type { MatchResult, FormFieldInfo, MaterialRole } from '@/utils/matcher';
 
@@ -276,6 +276,22 @@ export default defineBackground(() => {
 
     return true;
   });
+
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'stream-fill') return;
+    port.onMessage.addListener(async (msg) => {
+      if (msg.type === 'startStreamScan') {
+        await handleStreamScan(port);
+      }
+    });
+  });
+
+  chrome.commands.onCommand.addListener(async (command) => {
+    if (command === 'stream-fill') {
+      console.log('%c⌨️ 快捷键触发流式填充', 'color:#6C5CE7;font-weight:bold');
+      await handleStreamScan();
+    }
+  });
 });
 
 async function seedDevData() {
@@ -408,4 +424,118 @@ async function handleFill(
   );
 
   return { ok: true, type: 'fill', success: result.success, failure: result.failure };
+}
+
+async function handleStreamScan(port?: chrome.runtime.Port): Promise<void> {
+  const tab = await getCurrentTab();
+  if (!tab?.id) {
+    port?.postMessage({ type: 'streamError', error: 'No active tab found' });
+    port?.disconnect();
+    return;
+  }
+
+  const sendProgress = (matched: number, total: number, latestLabel: string) => {
+    port?.postMessage({ type: 'streamProgress', matched, total, latestLabel });
+  };
+
+  try {
+    // 1. Scan fields
+    const scanResults = await sendToContentScript<
+      Array<{ index: number; field: FormFieldInfo }>
+    >(tab.id, { type: 'scan' });
+
+    if (!scanResults || scanResults.length === 0) {
+      port?.postMessage({ type: 'streamComplete', matched: 0, errorCount: 0 });
+      port?.disconnect();
+      return;
+    }
+
+    const fieldInfos = scanResults.map((r) => ({ ...r.field, index: r.index }));
+    const textFieldInfos = fieldInfos.filter((f) => f.kind !== 'file');
+    const totalFields = fieldInfos.length;
+
+    // 2. Load data
+    const [textFields, apiConfig, textApiReady, fileRecords, categories] = await Promise.all([
+      getAllTextFields(),
+      getApiConfig(),
+      isApiConfigured(),
+      getAllFileRecords(),
+      getAllCategories(),
+    ]);
+
+    let matched = 0;
+    let errorCount = 0;
+
+    // 3. Init content script for streaming
+    await sendToContentScript(tab.id, {
+      type: 'fillStreamInit',
+      items: fieldInfos.map((f) => ({ index: f.index, fillMode: f.fillMode ?? 'short' })),
+    });
+
+    // 4. File matches (non-streaming, fill immediately)
+    const fileMatches = matchFileFields(fieldInfos, fileRecords, categories);
+    const fileRecordById = new Map<number, FileRecord>();
+    if (fileMatches.length > 0) {
+      const records = await getAllFileRecords();
+      for (const r of records) { if (r.id != null) fileRecordById.set(r.id, r); }
+    }
+
+    for (const fm of fileMatches) {
+      if (fm.fileRecordId == null) continue;
+      const record = fileRecordById.get(fm.fileRecordId);
+      if (!record) continue;
+      try {
+        await sendToContentScript(tab.id, {
+          type: 'fillField',
+          index: fm.index,
+          value: fm.value,
+        });
+        matched++;
+        sendProgress(matched, totalFields, fm.shortLabel);
+      } catch { errorCount++; }
+    }
+
+    // 5. Stream text matches
+    if (textApiReady && textFieldInfos.length > 0 && textFields.length > 0) {
+      for await (const event of matchFieldsStream(textFieldInfos, apiConfig, textFields)) {
+        if (event.type === 'value_chunk') {
+          try {
+            await sendToContentScript(tab.id, {
+              type: 'fillTypeChunk',
+              index: event.index,
+              chunk: event.chunk,
+            });
+          } catch { /* tab may have closed */ }
+        } else if (event.type === 'match_complete') {
+          const match = event.match;
+          try {
+            if (match.fillMode === 'long') {
+              await sendToContentScript(tab.id, {
+                type: 'fillTypeCommit',
+                index: match.index,
+              });
+            } else {
+              await sendToContentScript(tab.id, {
+                type: 'fillField',
+                index: match.index,
+                value: match.value,
+              });
+            }
+            matched++;
+            sendProgress(matched, totalFields, match.shortLabel);
+          } catch { errorCount++; }
+        }
+      }
+    }
+
+    // 6. Complete
+    try {
+      await sendToContentScript(tab.id, { type: 'fillStreamComplete' });
+    } catch { /* ignore */ }
+    port?.postMessage({ type: 'streamComplete', matched, errorCount });
+  } catch (err) {
+    port?.postMessage({ type: 'streamError', error: (err as Error).message });
+  } finally {
+    port?.disconnect();
+  }
 }
