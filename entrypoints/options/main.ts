@@ -238,7 +238,7 @@ function bindPdfPageEvents() {
       }
 
       const pdfBytes = await mergeFilesToPdf(mergeItems);
-      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const pdfBlob = new Blob([new Uint8Array(pdfBytes) as BlobPart], { type: 'application/pdf' });
 
       const filenameInput = document.getElementById('pdfFilename') as HTMLInputElement;
       const filename = (filenameInput.value.trim() || '合并文档') + '.pdf';
