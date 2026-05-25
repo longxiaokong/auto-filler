@@ -26,8 +26,8 @@ export default defineConfig({
     name: 'Auto Filler',
     permissions: ['storage', 'activeTab', 'scripting'],
     host_permissions: ['<all_urls>'],
-    externally_connectable: {
-      matches: ['http://localhost:*/*'],
+    options_ui: {
+      open_in_tab: true,
     },
   },
 });
