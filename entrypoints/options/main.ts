@@ -126,6 +126,7 @@ function renderPdfPage() {
         <button class="pdf-btn-secondary" id="pdfUploadLocal">+ 本地上传</button>
         <button class="pdf-btn-primary${pdfMergeQueue.length === 0 ? ' disabled' : ''}" id="pdfMergeBtn" ${pdfMergeQueue.length === 0 ? 'disabled' : ''}>合成 PDF</button>
       </div>
+      <div class="pdf-hint">本地上传的文件/合成的PDF将自动保存到证明材料（未分类）</div>
     </div>
   `;
 
@@ -254,17 +255,11 @@ function bindPdfPageEvents() {
       });
       fileRecords = await getAllFileRecords();
 
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-
       pdfMergeQueue = [];
       renderPdfPage();
+
+      const hint = document.querySelector('.pdf-hint');
+      if (hint) hint.textContent = `已保存到证明材料：${filename}（可在证书材料中下载）`;
     } catch (err) {
       console.error('PDF merge failed:', err);
       alert('PDF 合成失败，请检查文件格式');
@@ -680,6 +675,7 @@ const ICON_PREVIEW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none
 const ICON_RENAME = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 const ICON_MOVE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
 const ICON_DELETE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+const ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + 'B';
@@ -785,6 +781,7 @@ function renderFileCardHtml(f: FileRecord): string {
       <button class="cert-file-action-btn preview" data-file-id="${f.id}" title="预览">${ICON_PREVIEW}</button>
       <button class="cert-file-action-btn rename" data-file-id="${f.id}" title="重命名">${ICON_RENAME}</button>
       <button class="cert-file-action-btn move" data-file-id="${f.id}" title="移动">${ICON_MOVE}</button>
+      <button class="cert-file-action-btn download" data-file-id="${f.id}" title="下载">${ICON_DOWNLOAD}</button>
       ${confirmHtml}
     </div>
   `;
@@ -822,6 +819,7 @@ function renderFileCardHtml(f: FileRecord): string {
         <button class="cert-file-action-btn preview" data-file-id="${f.id}" title="预览">${ICON_PREVIEW}</button>
         <button class="cert-file-action-btn rename" data-file-id="${f.id}" title="重命名">${ICON_RENAME}</button>
         <button class="cert-file-action-btn move" data-file-id="${f.id}" title="移动">${ICON_MOVE}</button>
+        <button class="cert-file-action-btn download" data-file-id="${f.id}" title="下载">${ICON_DOWNLOAD}</button>
         ${confirmHtml}
       </div>
     </div>
@@ -1076,6 +1074,24 @@ function bindCertEvents() {
         if (ev.key === 'Escape') renderCertificatesPage();
       });
       input.addEventListener('blur', doRename);
+    });
+  });
+
+  // File download
+  document.querySelectorAll<HTMLButtonElement>('.cert-file-action-btn.download').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fileId = Number(btn.dataset.fileId);
+      const file = fileRecords.find(f => f.id === fileId);
+      if (!file) return;
+      const url = URL.createObjectURL(file.fileBody);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     });
   });
 
