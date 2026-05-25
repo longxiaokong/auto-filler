@@ -62,7 +62,7 @@ function renderHeader() {
   header.className = 'header';
   header.innerHTML = `
     <div class="header-left">
-      <div class="logo-icon">AI</div>
+      <img class="logo-icon" src="/logo.png" alt="Auto Filler" />
       <span class="logo-text">智能填表助手</span>
     </div>
     <div class="header-right">

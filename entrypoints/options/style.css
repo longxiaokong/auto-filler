@@ -42,14 +42,8 @@ body {
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: #257FFD;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  object-fit: contain;
 }
 
 .brand-text {
