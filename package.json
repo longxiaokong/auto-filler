@@ -11,10 +11,11 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
+    "compile": "tsc --noEmit --project .wxt/tsconfig.json",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "@types/chrome": "^0.1.42",
     "typescript": "^5.9.3",
     "wxt": "^0.20.26"
   }
