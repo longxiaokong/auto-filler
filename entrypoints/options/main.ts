@@ -28,7 +28,6 @@ const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
   home: { title: '首页', subtitle: '概览与快捷入口' },
   profile: { title: '首页', subtitle: '' },
   certificates: { title: '证书材料', subtitle: '管理与维护您的证书和证明材料' },
-  autofill: { title: '自动填表', subtitle: '配置自动填表规则与历史记录' },
   docfill: { title: '上传文档智能填充', subtitle: '支持上传 Word / PDF 文档，系统会自动识别字段并匹配信息' },
   pdf: { title: '按顺序生成 PDF', subtitle: '将证明材料按指定顺序排列，生成完整申请材料 PDF' },
   settings: { title: '设置', subtitle: '个人信息、API 配置与账户设置' },

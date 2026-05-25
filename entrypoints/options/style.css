@@ -124,53 +124,7 @@ body {
   color: #667085;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
-.member-btn {
-  padding: 6px 16px;
-  border: 1px solid #E5EAF2;
-  border-radius: 8px;
-  background: #FFFFFF;
-  color: #667085;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.member-btn:hover {
-  background: #F9FAFB;
-  border-color: #D1D5DB;
-}
-
-.icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: 1px solid #E5EAF2;
-  background: #FFFFFF;
-  color: #667085;
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.icon-btn:hover {
-  background: #F9FAFB;
-  border-color: #D1D5DB;
-}
-
-.icon-btn.avatar {
-  background: #EAF2FF;
-  border-color: #BBD7FF;
-  color: #257FFD;
-}
 
 /* ===== Page content ===== */
 .page-content {
