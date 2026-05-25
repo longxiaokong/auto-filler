@@ -921,6 +921,17 @@ body {
   border-color: #257FFD;
 }
 
+.field-row-locked .field-key {
+  background: #F9FAFB;
+  color: #667085;
+  cursor: default;
+}
+
+.field-row-locked .field-key:focus {
+  border-color: #E5EAF2;
+  box-shadow: none;
+}
+
 /* ===== Scrollbar ===== */
 .page-content::-webkit-scrollbar {
   width: 6px;

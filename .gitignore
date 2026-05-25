@@ -7,6 +7,9 @@ dist/
 .output/
 *.zip
 
+# Chrome profile (persistent dev data)
+.chrome-profile/
+
 # macOS
 .DS_Store
 package-lock.json
