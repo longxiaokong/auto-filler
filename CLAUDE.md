@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Auto Filler is a Chrome extension that uses LLM-powered semantic matching to automatically fill web forms with user-stored personal information. Data stays local (IndexedDB + chrome.storage). Works with any OpenAI-compatible API.
+秒填鸭 is a Chrome extension that uses LLM-powered semantic matching to automatically fill web forms with user-stored personal information. Data stays local (IndexedDB + chrome.storage). Works with any OpenAI-compatible API.
 
 ## Commands
 

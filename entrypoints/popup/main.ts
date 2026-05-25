@@ -64,8 +64,8 @@ function renderHeader() {
   header.className = 'header';
   header.innerHTML = `
     <div class="header-left">
-      <img class="logo-icon" src="/logo.png" alt="Auto Filler" />
-      <span class="logo-text">智能填表助手</span>
+      <img class="logo-icon" src="/logo.png" alt="秒填鸭" />
+      <span class="logo-text">秒填鸭</span>
     </div>
     <div class="header-right">
       <button class="avatar-btn" id="avatarBtn" title="工作台">用</button>

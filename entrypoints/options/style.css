@@ -669,11 +669,27 @@ body {
 }
 
 /* ===== Dynamic field rows (settings) ===== */
+.profile-field-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 1px solid #E5EAF2;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #FFFFFF;
+}
+
 .field-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.field-row:last-child {
+  border-bottom: none;
 }
 
 .field-row .field-key {

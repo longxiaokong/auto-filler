@@ -111,7 +111,8 @@ async function seedDevData() {
   if (!apiReady) {
     await setApiConfig({
       baseUrl: 'https://api.deepseek.com/v1',
-      apiKey: 'sk-87f5684509814e7393b0f523b286147d',
+      // Intentionally left blank. Do not hardcode API keys in the repo.
+      apiKey: '',
       model: 'deepseek-chat',
     });
   }

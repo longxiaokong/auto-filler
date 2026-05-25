@@ -26,7 +26,7 @@ const DEFAULT_FIELD_LABELS: Record<string, string> = Object.fromEntries(
 
 const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
   home: { title: '首页', subtitle: '概览与快捷入口' },
-  profile: { title: '个人信息与材料管理', subtitle: '完善个人信息与材料库，提升填表效率与准确性' },
+  profile: { title: '首页', subtitle: '' },
   certificates: { title: '证书材料', subtitle: '管理与维护您的证书和证明材料' },
   autofill: { title: '自动填表', subtitle: '配置自动填表规则与历史记录' },
   docfill: { title: '上传文档智能填充', subtitle: '支持上传 Word / PDF 文档，系统会自动识别字段并匹配信息' },
@@ -955,10 +955,10 @@ function renderSettingsPage() {
   const customFieldRows = customFields.map((f) => createFieldRowHtml(f.key, f.value, false)).join('');
 
   pageContent.innerHTML = `
-    <div class="settings-form">
-      <div class="settings-section">
-        <h2>个人信息</h2>
-        <div id="fieldList">${defaultFieldRows}${customFieldRows}</div>
+      <div class="settings-form">
+        <div class="settings-section">
+          <h2>个人信息</h2>
+        <ul class="profile-field-list" id="fieldList">${defaultFieldRows}${customFieldRows}</ul>
         <button class="add-btn" id="addFieldBtn">+ 添加字段</button>
       </div>
 
@@ -1101,30 +1101,30 @@ function createFieldRowHtml(key: string, value: string, locked = false): string 
   if (locked) {
     const label = DEFAULT_FIELD_LABELS[key] ?? key;
     return `
-      <div class="field-row field-row-locked" data-id="${id}" data-key="${escapeAttr(key)}">
+      <li class="field-row field-row-locked" data-id="${id}" data-key="${escapeAttr(key)}">
         <span class="field-key-label">${escapeHtml(label)}</span>
         <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
-      </div>
+      </li>
     `;
   }
   return `
-    <div class="field-row" data-id="${id}">
+    <li class="field-row" data-id="${id}">
       <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
       <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
       <button class="btn-delete" title="删除">&times;</button>
-    </div>
+    </li>
   `;
 }
 
-function createFieldRowEl(key: string, value: string): HTMLDivElement {
+function createFieldRowEl(key: string, value: string): HTMLLIElement {
   const id = nextFieldId++;
-  const row = document.createElement('div');
+  const row = document.createElement('li');
   row.className = 'field-row';
   row.dataset.id = String(id);
   row.innerHTML = `
     <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
     <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
-    <button class="btn-delete" title="delete">&times;</button>
+    <button class="btn-delete" title="删除">&times;</button>
   `;
   row.querySelector('.btn-delete')!.addEventListener('click', () => row.remove());
   return row;
