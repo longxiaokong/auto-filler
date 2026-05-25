@@ -32,6 +32,7 @@ export interface MatchResult {
   value: string;
   shortLabel: string;
   confidence: 'high' | 'medium' | 'low';
+  fillMode?: 'short' | 'long';
   fileRecordId?: number;
   fileName?: string;
   fileType?: string;
@@ -85,11 +86,13 @@ ${fieldList}
 - 民族、性别、婚否、政治面貌等下拉项应根据 options 中最接近的选项文本匹配，value 返回网页可接受的选项文本。
 - 优先依据 label、hint、html 中的当前字段行/局部容器理解字段含义；context 只是辅助信息；name/id 只是技术标识，含义不清时不要强行匹配
 - 每个表单字段最多匹配一个用户字段。无法推理出合理值时不要返回该字段。
+- **特别重要：fillMode=long 的长文本字段必须返回匹配项，绝对不可跳过。** 即使页面上下文不明确，也要综合用户全部信息生成一段通顺稳妥的自我介绍/个人陈述文本。
 - 为每个返回项生成一个简短字段名 shortLabel，2 到 8 个中文字符或简短英文，不要直接复制很长的上下文。
 - confidence 只能是 high、medium、low：
   - high：字段含义和取值都明确，几乎可直接填。
   - medium：语义基本匹配，但有格式/派生推理或上下文略有歧义。
   - low：可能匹配，但需要用户重点确认。
+- 对 fillMode=long 的字段，confidence 固定为 high。
 
 ## 输出格式
 返回 JSON 数组，每个元素包含：
@@ -170,14 +173,19 @@ export async function matchFields(
 
   const rawResults = JSON.parse(jsonMatch[0]) as Array<Partial<MatchResult>>;
   const fieldByIndex = new Map(textLikeFields.map((f) => [f.index, f]));
-  const results: MatchResult[] = rawResults.map((r) => ({
-    kind: 'text',
-    index: Number(r.index),
-    fieldKey: String(r.fieldKey ?? ''),
-    value: String(r.value ?? ''),
-    shortLabel: String(r.shortLabel || fallbackShortLabel(fieldByIndex.get(Number(r.index)), String(r.fieldKey ?? ''), Number(r.index))),
-    confidence: normalizeConfidence(r.confidence),
-  }));
+  const results: MatchResult[] = rawResults.map((r) => {
+    const field = fieldByIndex.get(Number(r.index));
+    const isLong = field?.fillMode === 'long';
+    return {
+      kind: 'text',
+      index: Number(r.index),
+      fieldKey: String(r.fieldKey ?? ''),
+      value: String(r.value ?? ''),
+      shortLabel: String(r.shortLabel || fallbackShortLabel(field, String(r.fieldKey ?? ''), Number(r.index))),
+      confidence: isLong ? 'high' : normalizeConfidence(r.confidence),
+      fillMode: field?.fillMode,
+    };
+  });
 
   console.group('%c📋 匹配结果', 'color:#ff9800;font-weight:bold');
   results.forEach((r) => console.log(`  [${r.index}] ${r.confidence} "${r.shortLabel}" "${r.fieldKey}" ← "${r.value}"`));

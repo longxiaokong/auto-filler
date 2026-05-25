@@ -36,6 +36,7 @@ interface DisplayItem {
   value: string;
   status: 'matched' | 'pending' | 'unmatched';
   confidence?: Confidence;
+  fillMode?: 'short' | 'long';
   checked: boolean;
   match?: MatchResult;
 }
@@ -149,18 +150,22 @@ function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
     matchedSet.set(m.index, m);
   }
 
+  const fieldByIndex = new Map(scanResp.fields.map((f) => [f.index, f]));
   const items: DisplayItem[] = [];
 
   for (const m of scanResp.matches) {
-    const confidence = normalizeConfidence(m.confidence);
+    const field = fieldByIndex.get(m.index);
+    const fillMode = m.fillMode ?? field?.fillMode;
+    const isLong = fillMode === 'long';
     items.push({
       kind: m.kind ?? 'text',
       index: m.index,
       label: shortenLabel(m.shortLabel || m.fieldKey || `字段 #${m.index}`),
       value: m.value,
-      status: confidence === 'high' ? 'matched' : 'pending',
-      confidence,
-      checked: confidence !== 'low',
+      status: isLong ? 'matched' : (m.confidence === 'high' ? 'matched' : 'pending'),
+      confidence: isLong ? undefined : m.confidence,
+      fillMode,
+      checked: isLong ? true : (m.confidence !== 'low'),
       match: m,
     });
   }
@@ -246,7 +251,7 @@ function renderResult(scanResp: ScanResponse) {
   const list = document.getElementById('fieldList')!;
   for (const item of displayItems) {
     const li = document.createElement('li');
-    li.className = `field-item ${item.kind === 'file' ? 'file-item' : ''} ${item.confidence ? `confidence-${item.confidence}` : ''}`.trim();
+    li.className = `field-item ${item.kind === 'file' ? 'file-item' : ''} ${item.fillMode === 'long' ? 'long-text-item' : ''} ${item.confidence ? `confidence-${item.confidence}` : ''}`.trim();
 
     const checkboxHtml = item.status !== 'unmatched'
       ? `<input type="checkbox" data-idx="${item.index}" ${item.checked ? 'checked' : ''} />`
@@ -278,6 +283,10 @@ function renderResult(scanResp: ScanResponse) {
 function getStatusHtml(item: DisplayItem): string {
   if (item.status === 'unmatched') {
     return '<span class="status-tag unmatched">未匹配</span>';
+  }
+
+  if (item.fillMode === 'long') {
+    return '<span class="status-tag long-text">长文本</span>';
   }
 
   const confidence = item.confidence ?? 'medium';
