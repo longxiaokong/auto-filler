@@ -40,6 +40,7 @@ let blockCategories: BlockCategory[] = [];
 let categories: Category[] = [];
 let fileRecords: FileRecord[] = [];
 let selectedCategoryId: number | null = null;
+let certViewMode: 'grid' | 'list' = 'list';
 let apiConfigData: { baseUrl: string; apiKey: string; model: string; providerId: string } | null = null;
 let nextFieldId = 0;
 
@@ -122,28 +123,26 @@ function renderProfilePage() {
     <button class="add-btn add-block-cat-btn" style="margin-bottom: 20px;">+ 添加分类</button>
   `;
 
-  // Mock materials
-  const materials = [
-    { name: '身份证正反面', status: '可调用', icon: '🆔' },
-    { name: '学生证', status: '可调用', icon: '🎓' },
-    { name: '一寸证件照', status: '可调用', icon: '📷' },
-    { name: '成绩单 PDF', status: '可调用', icon: '📄' },
-  ];
+  // Real materials from IndexedDB, grouped by category
+  const recentFiles = [...fileRecords].sort((a, b) => b.createdAt - a.createdAt).slice(0, 8);
+  const totalFiles = fileRecords.length;
 
-  const materialHtml = materials.map((m) => `
-    <div class="material-item">
-      <div class="material-thumb">${m.icon}</div>
-      <div class="material-info">
-        <div class="material-name">${escapeHtml(m.name)}</div>
-        <span class="material-status">${m.status}</span>
-      </div>
-      <div class="material-actions">
-        <button>替换</button>
-        <button>设为常用</button>
-        <button class="delete">删除</button>
-      </div>
-    </div>
-  `).join('');
+  const materialHtml = recentFiles.length === 0
+    ? `<div class="material-empty">暂无材料，点击上方按钮添加</div>`
+    : recentFiles.map((f) => {
+        const cat = categories.find(c => c.id === f.categoryId);
+        const { icon } = getFileCategoryIcon(f.fileType);
+        return `
+          <div class="material-item cert-file-card-link" data-file-id="${f.id}" data-cat-id="${f.categoryId}">
+            <div class="material-thumb">${IMAGE_TYPES.has(f.fileType) ? '<img class="material-thumb-img" data-file-id="' + f.id + '" src="" alt="" />' : icon}</div>
+            <div class="material-info">
+              <div class="material-name">${escapeHtml(f.filename)}</div>
+              <span class="material-cat">${cat ? escapeHtml(cat.name) : '未分类'}</span>
+            </div>
+            <div class="material-arrow">›</div>
+          </div>
+        `;
+      }).join('');
 
   const firstName = fieldMap['name']?.[0] || '用';
 
@@ -170,9 +169,9 @@ function renderProfilePage() {
           <div class="material-header">
             <div>
               <div class="card-title">材料库</div>
-              <div class="material-count">共 ${materials.length} 个材料</div>
+              <div class="material-count">共 ${totalFiles} 个材料</div>
             </div>
-            <button class="upload-btn">上传材料</button>
+            <button class="upload-btn" id="goToMaterialsBtn">管理材料</button>
           </div>
           <div class="material-list">${materialHtml}</div>
         </div>
@@ -182,6 +181,27 @@ function renderProfilePage() {
 
   document.getElementById('editProfileBtn')?.addEventListener('click', () => {
     switchPage('settings');
+  });
+
+  document.getElementById('goToMaterialsBtn')?.addEventListener('click', () => {
+    switchPage('certificates');
+  });
+
+  // Load image thumbnails
+  for (const f of recentFiles) {
+    if (IMAGE_TYPES.has(f.fileType)) {
+      const img = document.querySelector(`img.material-thumb-img[data-file-id="${f.id}"]`) as HTMLImageElement;
+      if (img) img.src = URL.createObjectURL(f.fileBody);
+    }
+  }
+
+  // Click material item → navigate to certificates page with that category selected
+  pageContent.querySelectorAll<HTMLElement>('.cert-file-card-link').forEach(el => {
+    el.addEventListener('click', () => {
+      const catId = parseInt(el.dataset.catId!, 10);
+      selectedCategoryId = catId;
+      switchPage('certificates');
+    });
   });
 
   bindBlockEvents();
@@ -421,6 +441,11 @@ function bindBlockItemEditEvents(editCard: HTMLElement, catId: number, itemIdx: 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 const FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx';
 
+const ICON_PREVIEW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON_RENAME = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+const ICON_MOVE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+const ICON_DELETE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + 'B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
@@ -454,12 +479,19 @@ function renderCertificatesPage() {
       <div class="cert-main">
         <div class="cert-toolbar">
           <input type="text" class="cert-search" placeholder="搜索文件名..." id="certSearch" />
-          <button class="cert-upload-btn" id="certUploadBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-            上传材料
-          </button>
+          <div class="cert-toolbar-right">
+            <button class="cert-view-toggle" id="certViewToggle" title="${certViewMode === 'grid' ? '切换到列表视图' : '切换到卡片视图'}">
+              ${certViewMode === 'grid'
+                ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'
+                : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>'}
+            </button>
+            <button class="cert-upload-btn" id="certUploadBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              上传材料
+            </button>
+          </div>
         </div>
-        <div class="cert-file-grid" id="certFileGrid">${fileHtml}</div>
+        <div class="cert-file-grid cert-view-${certViewMode}" id="certFileGrid">${fileHtml}</div>
       </div>
     </div>
   `;
@@ -481,8 +513,8 @@ function renderCatSidebar(): string {
         </div>
         <div class="cert-cat-actions">
           ${!cat.isDefault ? `
-            <button class="cert-cat-action-btn rename" title="重命名">✏️</button>
-            <button class="cert-cat-action-btn delete${confirmClass}" data-cat-id="${cat.id}" title="删除">${cat._confirmDelete ? '确认' : '🗑️'}</button>
+            <button class="cert-cat-action-btn rename" title="重命名">${ICON_RENAME}</button>
+            <button class="cert-cat-action-btn delete${confirmClass}" data-cat-id="${cat.id}" title="删除">${cat._confirmDelete ? '确认' : ICON_DELETE}</button>
           ` : ''}
         </div>
       </div>
@@ -507,18 +539,43 @@ function renderCertFilePanel(): string {
 
 function renderFileCardHtml(f: FileRecord): string {
   const isImage = IMAGE_TYPES.has(f.fileType);
-  let thumbHtml: string;
-  if (isImage) {
-    thumbHtml = `<div class="cert-file-thumb"><img src="" data-file-id="${f.id}" alt="${escapeAttr(f.filename)}" /></div>`;
-  } else {
-    const { cls, icon } = getFileCategoryIcon(f.fileType);
-    thumbHtml = `<div class="cert-file-thumb"><span class="cert-file-thumb-icon ${cls}">${icon}</span></div>`;
-  }
+  const { cls, icon } = getFileCategoryIcon(f.fileType);
 
   const confirmHtml = f._confirmDelete
     ? `<button class="cert-file-action-btn delete confirm-delete" data-file-id="${f.id}">确认?</button>`
-    : `<button class="cert-file-action-btn delete" data-file-id="${f.id}" title="删除">🗑️</button>`;
+    : `<button class="cert-file-action-btn delete" data-file-id="${f.id}" title="删除">${ICON_DELETE}</button>`;
 
+  const actionsHtml = `
+    <div class="cert-file-actions">
+      <button class="cert-file-action-btn preview" data-file-id="${f.id}" title="预览">${ICON_PREVIEW}</button>
+      <button class="cert-file-action-btn rename" data-file-id="${f.id}" title="重命名">${ICON_RENAME}</button>
+      <button class="cert-file-action-btn move" data-file-id="${f.id}" title="移动">${ICON_MOVE}</button>
+      ${confirmHtml}
+    </div>
+  `;
+
+  if (certViewMode === 'list') {
+    const thumbHtml = isImage
+      ? `<div class="cert-file-thumb cert-file-thumb-sm"><img src="" data-file-id="${f.id}" alt="${escapeAttr(f.filename)}" /></div>`
+      : `<div class="cert-file-thumb cert-file-thumb-sm"><span class="cert-file-thumb-icon ${cls}">${icon}</span></div>`;
+    return `
+      <div class="cert-file-card cert-file-list-row" data-file-id="${f.id}">
+        ${thumbHtml}
+        <div class="cert-file-info cert-file-info-list">
+          <div class="cert-file-name" title="${escapeAttr(f.filename)}">${escapeHtml(f.filename)}</div>
+          <div class="cert-file-meta-list">
+            <span>${formatFileSize(f.fileSize)}</span>
+            <span>${f.fileType}</span>
+          </div>
+        </div>
+        ${actionsHtml}
+      </div>
+    `;
+  }
+
+  const thumbHtml = isImage
+    ? `<div class="cert-file-thumb"><img src="" data-file-id="${f.id}" alt="${escapeAttr(f.filename)}" /></div>`
+    : `<div class="cert-file-thumb"><span class="cert-file-thumb-icon ${cls}">${icon}</span></div>`;
   return `
     <div class="cert-file-card" data-file-id="${f.id}">
       ${thumbHtml}
@@ -527,8 +584,9 @@ function renderFileCardHtml(f: FileRecord): string {
         <div class="cert-file-size">${formatFileSize(f.fileSize)}</div>
       </div>
       <div class="cert-file-actions">
-        <button class="cert-file-action-btn preview" data-file-id="${f.id}" title="预览">👁️</button>
-        <button class="cert-file-action-btn move" data-file-id="${f.id}" title="移动">📁</button>
+        <button class="cert-file-action-btn preview" data-file-id="${f.id}" title="预览">${ICON_PREVIEW}</button>
+        <button class="cert-file-action-btn rename" data-file-id="${f.id}" title="重命名">${ICON_RENAME}</button>
+        <button class="cert-file-action-btn move" data-file-id="${f.id}" title="移动">${ICON_MOVE}</button>
         ${confirmHtml}
       </div>
     </div>
@@ -601,6 +659,12 @@ function bindCertEvents() {
     const lastCard = grid?.lastElementChild as HTMLElement;
     lastCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+
+  // View toggle
+  document.getElementById('certViewToggle')?.addEventListener('click', () => {
+    certViewMode = certViewMode === 'grid' ? 'list' : 'grid';
+    renderCertificatesPage();
+  });
 
   document.getElementById('certUploadBtn')?.addEventListener('click', async () => {
     const files = await triggerUpload();
@@ -740,6 +804,46 @@ function bindCertEvents() {
     });
   });
 
+  // File rename
+  document.querySelectorAll<HTMLButtonElement>('.cert-file-action-btn.rename').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fileId = Number(btn.dataset.fileId);
+      const file = fileRecords.find(f => f.id === fileId);
+      if (!file) return;
+
+      const card = btn.closest('.cert-file-card')!;
+      const nameEl = card.querySelector('.cert-file-name') as HTMLElement;
+      const original = file.filename;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'cert-file-rename-input';
+      input.value = original;
+      nameEl.replaceWith(input);
+      input.focus();
+
+      // Select name without extension
+      const dotIdx = original.lastIndexOf('.');
+      input.setSelectionRange(0, dotIdx > 0 ? dotIdx : original.length);
+
+      async function doRename() {
+        const newName = input.value.trim();
+        if (newName && newName !== original && file) {
+          file.filename = newName;
+          await updateFileRecord(file);
+          fileRecords = fileRecords.map(f => f.id === file.id ? file : f);
+        }
+        renderCertificatesPage();
+      }
+
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') doRename();
+        if (ev.key === 'Escape') renderCertificatesPage();
+      });
+      input.addEventListener('blur', doRename);
+    });
+  });
+
   // File move
   document.querySelectorAll<HTMLButtonElement>('.cert-file-action-btn.move').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -752,7 +856,7 @@ function bindCertEvents() {
       document.querySelectorAll('.cert-move-dropdown').forEach(d => d.remove());
 
       const card = btn.closest('.cert-file-card')!;
-      const actions = card.querySelector('.cert-file-actions')!;
+      document.querySelectorAll('.cert-move-dropdown').forEach(d => d.remove());
       const dropdown = document.createElement('div');
       dropdown.className = 'cert-move-dropdown';
       dropdown.innerHTML = categories
@@ -763,7 +867,7 @@ function bindCertEvents() {
             ${escapeHtml(c.name)}${isCurrent ? ' (当前)' : ''}
           </div>`;
         }).join('');
-      actions.appendChild(dropdown);
+      card.appendChild(dropdown);
 
       dropdown.addEventListener('click', async (e) => {
         const target = (e.target as HTMLElement).closest('.cert-move-dropdown-item') as HTMLElement | null;
