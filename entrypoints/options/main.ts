@@ -1,6 +1,11 @@
 import { getApiConfig, setApiConfig } from '../../utils/storage';
-import { getAllTextFields, saveAllTextFields, getAllBlockCategories, saveBlockCategory, deleteBlockCategory } from '../../utils/db';
-import type { TextField, BlockCategory, BlockItem } from '../../utils/db';
+import {
+  getAllTextFields, saveAllTextFields, getAllBlockCategories, saveBlockCategory, deleteBlockCategory,
+  getAllCategories, addCategory, updateCategory, deleteCategory,
+  getAllFileRecords, getFileRecordsByCategory, addFileRecord, updateFileRecord, deleteFileRecord,
+  moveFileRecordsToCategory, getUncategorizedId,
+} from '../../utils/db';
+import type { TextField, BlockCategory, BlockItem, Category, FileRecord } from '../../utils/db';
 import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
@@ -32,6 +37,9 @@ const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
 let currentPage = 'profile';
 let textFields: TextField[] = [];
 let blockCategories: BlockCategory[] = [];
+let categories: Category[] = [];
+let fileRecords: FileRecord[] = [];
+let selectedCategoryId: number | null = null;
 let apiConfigData: { baseUrl: string; apiKey: string; model: string; providerId: string } | null = null;
 let nextFieldId = 0;
 
@@ -58,6 +66,8 @@ function switchPage(page: string) {
     renderProfilePage();
   } else if (page === 'settings') {
     renderSettingsPage();
+  } else if (page === 'certificates') {
+    renderCertificatesPage();
   } else {
     renderPlaceholderPage(config.title);
   }
@@ -406,6 +416,530 @@ function bindBlockItemEditEvents(editCard: HTMLElement, catId: number, itemIdx: 
   });
 }
 
+// ===== Certificates Page =====
+
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+const FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx';
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+}
+
+function getFileCategoryIcon(fileType: string): { cls: string; icon: string } {
+  if (fileType === 'application/pdf') return { cls: 'pdf', icon: '📄' };
+  if (fileType.includes('word') || fileType.includes('document')) return { cls: 'doc', icon: '📝' };
+  return { cls: 'other', icon: '📎' };
+}
+
+function renderCertificatesPage() {
+  if (categories.length === 0 || selectedCategoryId === null) {
+    const unc = categories.find(c => c.isDefault);
+    selectedCategoryId = unc?.id ?? null;
+  }
+
+  const catHtml = renderCatSidebar();
+  const fileHtml = renderCertFilePanel();
+
+  pageContent.innerHTML = `
+    <div class="cert-layout">
+      <div class="cert-sidebar">
+        <div class="cert-sidebar-title">分类管理</div>
+        <div class="cert-cat-list">${catHtml}</div>
+        <div class="cert-sidebar-footer">
+          <button class="cert-add-cat-btn" id="certAddCatBtn">+ 新增分类</button>
+        </div>
+      </div>
+      <div class="cert-main">
+        <div class="cert-toolbar">
+          <input type="text" class="cert-search" placeholder="搜索文件名..." id="certSearch" />
+          <button class="cert-upload-btn" id="certUploadBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            上传材料
+          </button>
+        </div>
+        <div class="cert-file-grid" id="certFileGrid">${fileHtml}</div>
+      </div>
+    </div>
+  `;
+
+  bindCertEvents();
+}
+
+function renderCatSidebar(): string {
+  return categories.map(cat => {
+    const count = fileRecords.filter(f => f.categoryId === cat.id).length;
+    const active = cat.id === selectedCategoryId ? ' active' : '';
+    const confirmClass = cat._confirmDelete ? ' confirm-delete' : '';
+    return `
+      <div class="cert-cat-item${active}" data-cat-id="${cat.id}">
+        <div class="cert-cat-icon"><img src="${escapeAttr(cat.icon)}" alt="" /></div>
+        <div class="cert-cat-info">
+          <div class="cert-cat-name" style="${cat._confirmDelete ? 'color:#EF4444' : ''}">${escapeHtml(cat._confirmDelete ? '确认删除？' : cat.name)}</div>
+          <div class="cert-cat-count">${count} 个文件</div>
+        </div>
+        <div class="cert-cat-actions">
+          ${!cat.isDefault ? `
+            <button class="cert-cat-action-btn rename" title="重命名">✏️</button>
+            <button class="cert-cat-action-btn delete${confirmClass}" data-cat-id="${cat.id}" title="删除">${cat._confirmDelete ? '确认' : '🗑️'}</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCertFilePanel(): string {
+  const catFiles = fileRecords.filter(f => f.categoryId === selectedCategoryId);
+  if (catFiles.length === 0) {
+    return `
+      <div class="cert-empty">
+        <div class="cert-empty-icon">📂</div>
+        <div class="cert-empty-text">该分类下暂无文件</div>
+        <button class="cert-empty-upload-btn" id="certEmptyUpload">上传文件到此分类</button>
+      </div>
+    `;
+  }
+
+  return catFiles.map(f => renderFileCardHtml(f)).join('');
+}
+
+function renderFileCardHtml(f: FileRecord): string {
+  const isImage = IMAGE_TYPES.has(f.fileType);
+  let thumbHtml: string;
+  if (isImage) {
+    thumbHtml = `<div class="cert-file-thumb"><img src="" data-file-id="${f.id}" alt="${escapeAttr(f.filename)}" /></div>`;
+  } else {
+    const { cls, icon } = getFileCategoryIcon(f.fileType);
+    thumbHtml = `<div class="cert-file-thumb"><span class="cert-file-thumb-icon ${cls}">${icon}</span></div>`;
+  }
+
+  const confirmHtml = f._confirmDelete
+    ? `<button class="cert-file-action-btn delete confirm-delete" data-file-id="${f.id}">确认?</button>`
+    : `<button class="cert-file-action-btn delete" data-file-id="${f.id}" title="删除">🗑️</button>`;
+
+  return `
+    <div class="cert-file-card" data-file-id="${f.id}">
+      ${thumbHtml}
+      <div class="cert-file-info">
+        <div class="cert-file-name" title="${escapeAttr(f.filename)}">${escapeHtml(f.filename)}</div>
+        <div class="cert-file-size">${formatFileSize(f.fileSize)}</div>
+      </div>
+      <div class="cert-file-actions">
+        <button class="cert-file-action-btn preview" data-file-id="${f.id}" title="预览">👁️</button>
+        <button class="cert-file-action-btn move" data-file-id="${f.id}" title="移动">📁</button>
+        ${confirmHtml}
+      </div>
+    </div>
+  `;
+}
+
+function bindCertEvents() {
+  // Load image thumbnails via blob URLs
+  const catFiles = fileRecords.filter(f => f.categoryId === selectedCategoryId);
+  for (const f of catFiles) {
+    if (IMAGE_TYPES.has(f.fileType)) {
+      const img = document.querySelector(`img[data-file-id="${f.id}"]`) as HTMLImageElement;
+      if (img) {
+        const url = URL.createObjectURL(f.fileBody);
+        img.src = url;
+      }
+    }
+  }
+
+  // Search
+  document.getElementById('certSearch')?.addEventListener('input', (e) => {
+    const query = (e.target as HTMLInputElement).value.trim().toLowerCase();
+    const grid = document.getElementById('certFileGrid')!;
+    const cards = grid.querySelectorAll<HTMLElement>('.cert-file-card');
+    cards.forEach(card => {
+      const name = card.querySelector('.cert-file-name')?.textContent ?? '';
+      card.style.display = (!query || name.toLowerCase().includes(query)) ? '' : 'none';
+    });
+  });
+
+  // Upload
+  const uploadInput = document.createElement('input');
+  uploadInput.type = 'file';
+  uploadInput.multiple = true;
+  uploadInput.accept = FILE_ACCEPT;
+  uploadInput.style.display = 'none';
+  document.body.appendChild(uploadInput);
+
+  let uploadResolve: ((files: File[]) => void) | null = null;
+  uploadInput.addEventListener('change', () => {
+    const files = Array.from(uploadInput.files ?? []);
+    if (uploadResolve) uploadResolve(files);
+    uploadInput.value = '';
+  });
+
+  function triggerUpload(): Promise<File[]> {
+    return new Promise(resolve => {
+      uploadResolve = resolve;
+      uploadInput.click();
+    });
+  }
+
+  async function doUpload(files: File[]) {
+    if (files.length === 0 || selectedCategoryId === null) return;
+    for (const file of files) {
+      await addFileRecord({
+        filename: file.name,
+        fileType: file.type,
+        fileBody: file,
+        fileSize: file.size,
+        fileDescription: '',
+        categoryId: selectedCategoryId,
+        createdAt: Date.now(),
+      });
+    }
+    fileRecords = await getAllFileRecords();
+    renderCertificatesPage();
+    // Scroll to last card
+    const grid = document.getElementById('certFileGrid');
+    const lastCard = grid?.lastElementChild as HTMLElement;
+    lastCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  document.getElementById('certUploadBtn')?.addEventListener('click', async () => {
+    const files = await triggerUpload();
+    await doUpload(files);
+  });
+
+  document.getElementById('certEmptyUpload')?.addEventListener('click', async () => {
+    const files = await triggerUpload();
+    await doUpload(files);
+  });
+
+  // Category click
+  document.querySelectorAll<HTMLElement>('.cert-cat-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.cert-cat-action-btn')) return;
+      const catId = Number(item.dataset.catId);
+      selectedCategoryId = catId;
+      renderCertificatesPage();
+    });
+  });
+
+  // Category rename
+  document.querySelectorAll<HTMLButtonElement>('.cert-cat-action-btn.rename').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const item = btn.closest('.cert-cat-item') as HTMLElement;
+      const catId = Number(item.dataset.catId);
+      const cat = categories.find(c => c.id === catId);
+      if (!cat) return;
+
+      const nameEl = item.querySelector('.cert-cat-name')!;
+      const original = cat.name;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'cert-cat-rename-input';
+      input.value = original;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      async function doRename() {
+        const newName = input.value.trim();
+        if (newName && newName !== original && cat) {
+          cat.name = newName;
+          await updateCategory(cat);
+        }
+        renderCertificatesPage();
+      }
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doRename();
+        if (e.key === 'Escape') renderCertificatesPage();
+      });
+      input.addEventListener('blur', doRename);
+    });
+  });
+
+  // Category delete
+  document.querySelectorAll<HTMLButtonElement>('.cert-cat-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const catId = Number(btn.dataset.catId);
+      const cat = categories.find(c => c.id === catId);
+      if (!cat || cat.isDefault) return;
+
+      if (cat._confirmDelete) {
+        delete cat._confirmDelete;
+        const uncId = await getUncategorizedId();
+        await moveFileRecordsToCategory(catId, uncId!);
+        await deleteCategory(catId);
+        categories = categories.filter(c => c.id !== catId);
+        selectedCategoryId = uncId;
+        renderCertificatesPage();
+      } else {
+        cat._confirmDelete = true;
+        renderCertificatesPage();
+        setTimeout(() => {
+          if (cat._confirmDelete) {
+            cat._confirmDelete = false;
+            renderCertificatesPage();
+          }
+        }, 3000);
+      }
+    });
+  });
+
+  // Add category
+  document.getElementById('certAddCatBtn')?.addEventListener('click', () => {
+    const footer = document.querySelector('.cert-sidebar-footer')!;
+    const btn = document.getElementById('certAddCatBtn')!;
+    const form = document.createElement('div');
+    form.className = 'cert-add-cat-form';
+    form.innerHTML = `
+      <input type="text" placeholder="输入分类名称" />
+      <button class="confirm">确定</button>
+      <button class="cancel">取消</button>
+    `;
+    btn.replaceWith(form);
+    const input = form.querySelector<HTMLInputElement>('input')!;
+    input.focus();
+
+    async function doAdd() {
+      const name = input.value.trim();
+      if (!name) { renderCertificatesPage(); return; }
+      const maxOrder = categories.reduce((m, c) => Math.max(m, c.sortOrder), 0);
+      const id = await addCategory({
+        name,
+        icon: '/icons/folder.svg',
+        sortOrder: maxOrder + 1,
+        isDefault: false,
+      });
+      categories.push({ id, name, icon: '/icons/folder.svg', sortOrder: maxOrder + 1, isDefault: false });
+      selectedCategoryId = id;
+      renderCertificatesPage();
+    }
+
+    function doCancel() {
+      renderCertificatesPage();
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAdd();
+      if (e.key === 'Escape') doCancel();
+    });
+    form.querySelector('.confirm')!.addEventListener('click', doAdd);
+    form.querySelector('.cancel')!.addEventListener('click', doCancel);
+  });
+
+  // File preview
+  document.querySelectorAll<HTMLButtonElement>('.cert-file-action-btn.preview').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fileId = Number(btn.dataset.fileId);
+      const file = fileRecords.find(f => f.id === fileId);
+      if (!file) return;
+      showPreviewModal(file);
+    });
+  });
+
+  // File move
+  document.querySelectorAll<HTMLButtonElement>('.cert-file-action-btn.move').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fileId = Number(btn.dataset.fileId);
+      const file = fileRecords.find(f => f.id === fileId);
+      if (!file) return;
+
+      // Remove existing dropdowns
+      document.querySelectorAll('.cert-move-dropdown').forEach(d => d.remove());
+
+      const card = btn.closest('.cert-file-card')!;
+      const actions = card.querySelector('.cert-file-actions')!;
+      const dropdown = document.createElement('div');
+      dropdown.className = 'cert-move-dropdown';
+      dropdown.innerHTML = categories
+        .map(c => {
+          const isCurrent = c.id === file.categoryId;
+          return `<div class="cert-move-dropdown-item${isCurrent ? ' current' : ''}" data-target-cat-id="${c.id}">
+            <img src="${escapeAttr(c.icon)}" width="14" height="14" alt="" />
+            ${escapeHtml(c.name)}${isCurrent ? ' (当前)' : ''}
+          </div>`;
+        }).join('');
+      actions.appendChild(dropdown);
+
+      dropdown.addEventListener('click', async (e) => {
+        const target = (e.target as HTMLElement).closest('.cert-move-dropdown-item') as HTMLElement | null;
+        if (!target) return;
+        const targetCatId = Number(target.dataset.targetCatId);
+        if (targetCatId === file.categoryId) { dropdown.remove(); return; }
+
+        file.categoryId = targetCatId;
+        await updateFileRecord(file);
+        fileRecords = fileRecords.map(f => f.id === file.id ? file : f);
+
+        card.classList.add('fade-out');
+        setTimeout(() => {
+          renderCertificatesPage();
+        }, 200);
+      });
+
+      // Close on click outside
+      const closeHandler = (e: MouseEvent) => {
+        if (!dropdown.contains(e.target as Node)) {
+          dropdown.remove();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeHandler), 0);
+    });
+  });
+
+  // File delete
+  document.querySelectorAll<HTMLButtonElement>('.cert-file-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const fileId = Number(btn.dataset.fileId);
+      const file = fileRecords.find(f => f.id === fileId);
+      if (!file) return;
+
+      if (file._confirmDelete) {
+        delete file._confirmDelete;
+        await deleteFileRecord(fileId);
+        fileRecords = fileRecords.filter(f => f.id !== fileId);
+        renderCertificatesPage();
+      } else {
+        file._confirmDelete = true;
+        renderCertificatesPage();
+        setTimeout(() => {
+          if (file._confirmDelete) {
+            file._confirmDelete = false;
+            renderCertificatesPage();
+          }
+        }, 3000);
+      }
+    });
+  });
+}
+
+function showPreviewModal(file: FileRecord) {
+  const isImage = IMAGE_TYPES.has(file.fileType);
+  const isPdf = file.fileType === 'application/pdf';
+  const sameCategoryFiles = fileRecords.filter(f => f.categoryId === file.categoryId && IMAGE_TYPES.has(f.fileType));
+  const currentIdx = sameCategoryFiles.findIndex(f => f.id === file.id);
+  const hasNav = isImage && sameCategoryFiles.length > 1;
+
+  let navHtml = '';
+  if (hasNav) {
+    navHtml = `
+      <button class="cert-modal-nav prev" id="modalPrev">&#8249;</button>
+      <button class="cert-modal-nav next" id="modalNext">&#8250;</button>
+    `;
+  }
+
+  let bodyHtml: string;
+  if (isImage) {
+    const url = URL.createObjectURL(file.fileBody);
+    bodyHtml = `<img src="${url}" alt="${escapeAttr(file.filename)}" />`;
+  } else if (isPdf) {
+    bodyHtml = `
+      <div style="text-align:center">
+        <div style="font-size:48px;margin-bottom:12px">📄</div>
+      </div>
+    `;
+  } else {
+    const { icon } = getFileCategoryIcon(file.fileType);
+    bodyHtml = `
+      <div style="text-align:center">
+        <div style="font-size:48px;margin-bottom:12px">${icon}</div>
+      </div>
+    `;
+  }
+
+  let footerHtml = '';
+  if (!isImage || !hasNav) {
+    footerHtml = `
+      <div class="cert-modal-info">
+        <div class="cert-modal-info-name">${escapeHtml(file.filename)}</div>
+        <div class="cert-modal-info-meta">
+          <span>${formatFileSize(file.fileSize)}</span>
+          <span>${file.fileType}</span>
+        </div>
+        ${isPdf ? `<button class="cert-modal-info-open" id="modalOpenNewTab">在新标签页中打开</button>` : ''}
+      </div>
+    `;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cert-modal-overlay';
+  overlay.innerHTML = `
+    <div class="cert-modal">
+      <button class="cert-modal-close" id="modalClose">&times;</button>
+      ${navHtml}
+      <div class="cert-modal-body">${bodyHtml}</div>
+      ${footerHtml}
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  let blobUrls: string[] = sameCategoryFiles.map(f => URL.createObjectURL(f.fileBody));
+  let viewIdx = currentIdx;
+  let imgEl = overlay.querySelector('.cert-modal-body img') as HTMLImageElement;
+
+  function updateModalImage() {
+    if (imgEl) {
+      imgEl.src = blobUrls[viewIdx];
+    }
+  }
+
+  overlay.querySelector('#modalClose')?.addEventListener('click', () => {
+    overlay.remove();
+    blobUrls.forEach(u => URL.revokeObjectURL(u));
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      blobUrls.forEach(u => URL.revokeObjectURL(u));
+    }
+  });
+
+  if (hasNav) {
+    overlay.querySelector('#modalPrev')?.addEventListener('click', () => {
+      viewIdx = (viewIdx - 1 + sameCategoryFiles.length) % sameCategoryFiles.length;
+      updateModalImage();
+    });
+    overlay.querySelector('#modalNext')?.addEventListener('click', () => {
+      viewIdx = (viewIdx + 1) % sameCategoryFiles.length;
+      updateModalImage();
+    });
+  }
+
+  if (isPdf) {
+    overlay.querySelector('#modalOpenNewTab')?.addEventListener('click', () => {
+      const url = URL.createObjectURL(file.fileBody);
+      window.open(url, '_blank');
+    });
+  }
+
+  // Keyboard nav
+  const keyHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      blobUrls.forEach(u => URL.revokeObjectURL(u));
+      document.removeEventListener('keydown', keyHandler);
+    }
+    if (hasNav) {
+      if (e.key === 'ArrowLeft') {
+        viewIdx = (viewIdx - 1 + sameCategoryFiles.length) % sameCategoryFiles.length;
+        updateModalImage();
+      }
+      if (e.key === 'ArrowRight') {
+        viewIdx = (viewIdx + 1) % sameCategoryFiles.length;
+        updateModalImage();
+      }
+    }
+  };
+  document.addEventListener('keydown', keyHandler);
+}
+
 // ===== Settings Page =====
 function renderSettingsPage() {
   const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '', providerId: '' };
@@ -674,10 +1208,12 @@ function escapeAttr(text: string): string {
 
 // ===== Init =====
 async function init() {
-  const [rawFields, apiConfig, blocks] = await Promise.all([
+  const [rawFields, apiConfig, blocks, cats, files] = await Promise.all([
     getAllTextFields(),
     getApiConfig(),
     getAllBlockCategories(),
+    getAllCategories(),
+    getAllFileRecords(),
   ]);
   let fields = rawFields;
 
@@ -723,6 +1259,8 @@ async function init() {
   textFields = fields;
   apiConfigData = apiConfig;
   blockCategories = blocks;
+  categories = cats;
+  fileRecords = files;
 
   switchPage('profile');
 }
