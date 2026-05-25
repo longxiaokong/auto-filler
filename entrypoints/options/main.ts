@@ -7,6 +7,7 @@ import {
 } from '../../utils/db';
 import type { TextField, BlockCategory, BlockItem, Category, FileRecord } from '../../utils/db';
 import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
+import { mergeFilesToPdf, type MergeFileItem } from '../../utils/pdf-merge';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
 const pageContent = document.getElementById('pageContent')!;
@@ -42,6 +43,7 @@ let selectedCategoryId: number | null = null;
 let certViewMode: 'grid' | 'list' = 'list';
 let apiConfigData: { baseUrl: string; apiKey: string; model: string; providerId: string } | null = null;
 let nextFieldId = 0;
+let pdfMergeQueue: { fileRecordId: number; name: string; type: string }[] = [];
 
 // ===== Navigation =====
 navItems.forEach((item) => {
@@ -68,6 +70,8 @@ function switchPage(page: string) {
     renderSettingsPage();
   } else if (page === 'certificates') {
     renderCertificatesPage();
+  } else if (page === 'pdf') {
+    renderPdfPage();
   } else {
     renderPlaceholderPage(config.title);
   }
@@ -81,6 +85,238 @@ function renderPlaceholderPage(title: string) {
       <p>该功能正在开发中，敬请期待</p>
     </div>
   `;
+}
+
+const PDF_ACCEPT_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf']);
+
+function renderPdfPage() {
+  const itemsHtml = pdfMergeQueue.map((item, idx) => {
+    const isImage = item.type !== 'application/pdf';
+    const icon = isImage ? '🖼' : '📄';
+    const file = fileRecords.find(f => f.id === item.fileRecordId);
+    const thumbHtml = (isImage && file)
+      ? `<img src="${URL.createObjectURL(file.fileBody)}" alt="" class="pdf-queue-thumb-img" />`
+      : `<span class="pdf-queue-thumb-icon">${icon}</span>`;
+    return `
+      <div class="pdf-queue-item" data-idx="${idx}" draggable="true">
+        <div class="pdf-queue-drag-handle">☰</div>
+        <div class="pdf-queue-thumb">${thumbHtml}</div>
+        <div class="pdf-queue-name">${escapeHtml(item.name)}</div>
+        <button class="pdf-queue-remove" data-idx="${idx}" title="移除">×</button>
+      </div>
+    `;
+  }).join('');
+
+  const emptyHtml = pdfMergeQueue.length === 0
+    ? '<div class="pdf-queue-empty">暂无文件，请从下方添加</div>'
+    : '';
+
+  pageContent.innerHTML = `
+    <div class="pdf-page">
+      <div class="pdf-filename-row">
+        <label for="pdfFilename">文件名</label>
+        <input type="text" id="pdfFilename" class="pdf-filename-input" placeholder="输入合成后的 PDF 文件名" value="合并文档" />
+        <span class="pdf-filename-ext">.pdf</span>
+      </div>
+      <div class="pdf-queue" id="pdfQueue">
+        ${itemsHtml}${emptyHtml}
+      </div>
+      <div class="pdf-actions">
+        <button class="pdf-btn-secondary" id="pdfPickFromRecords">+ 从证明材料选取</button>
+        <button class="pdf-btn-secondary" id="pdfUploadLocal">+ 本地上传</button>
+        <button class="pdf-btn-primary${pdfMergeQueue.length === 0 ? ' disabled' : ''}" id="pdfMergeBtn" ${pdfMergeQueue.length === 0 ? 'disabled' : ''}>合成 PDF</button>
+      </div>
+    </div>
+  `;
+
+  bindPdfPageEvents();
+}
+
+function bindPdfPageEvents() {
+  const queue = document.getElementById('pdfQueue')!;
+  let dragSrcIdx: number | null = null;
+
+  queue.querySelectorAll<HTMLElement>('.pdf-queue-item').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      dragSrcIdx = Number(item.dataset.idx);
+      item.classList.add('dragging');
+      (e as DragEvent).dataTransfer?.setData('text/plain', String(dragSrcIdx));
+      (e as DragEvent).dataTransfer!.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      queue.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      dragSrcIdx = null;
+    });
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      (e as DragEvent).dataTransfer!.dropEffect = 'move';
+      const target = (e.target as HTMLElement).closest('.pdf-queue-item') as HTMLElement | null;
+      if (target && target !== item) {
+        target.classList.add('drag-over');
+      }
+    });
+    item.addEventListener('dragleave', (e) => {
+      const target = (e.target as HTMLElement).closest('.pdf-queue-item') as HTMLElement | null;
+      if (target) target.classList.remove('drag-over');
+    });
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const target = (e.target as HTMLElement).closest('.pdf-queue-item') as HTMLElement | null;
+      if (!target || dragSrcIdx === null) return;
+      const dropIdx = Number(target.dataset.idx);
+      if (dropIdx === dragSrcIdx) return;
+      const [moved] = pdfMergeQueue.splice(dragSrcIdx, 1);
+      pdfMergeQueue.splice(dropIdx, 0, moved);
+      renderPdfPage();
+    });
+  });
+
+  queue.querySelectorAll<HTMLButtonElement>('.pdf-queue-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      pdfMergeQueue.splice(idx, 1);
+      renderPdfPage();
+    });
+  });
+
+  document.getElementById('pdfPickFromRecords')?.addEventListener('click', () => {
+    showPdfFilePickerModal();
+  });
+
+  document.getElementById('pdfUploadLocal')?.addEventListener('click', async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.jpg,.jpeg,.png,.webp,.pdf';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', async () => {
+      const files = Array.from(input.files ?? []);
+      const uncId = await getUncategorizedId();
+      if (!uncId) { input.remove(); return; }
+
+      for (const file of files) {
+        if (!PDF_ACCEPT_TYPES.has(file.type)) continue;
+        const id = await addFileRecord({
+          filename: file.name,
+          fileType: file.type,
+          fileBody: file,
+          fileSize: file.size,
+          fileDescription: '',
+          categoryId: uncId,
+          createdAt: Date.now(),
+        });
+        fileRecords = await getAllFileRecords();
+        pdfMergeQueue.push({ fileRecordId: id, name: file.name, type: file.type });
+      }
+      input.remove();
+      renderPdfPage();
+    });
+
+    input.click();
+  });
+
+  document.getElementById('pdfMergeBtn')?.addEventListener('click', async () => {
+    if (pdfMergeQueue.length === 0) return;
+    const btn = document.getElementById('pdfMergeBtn') as HTMLButtonElement;
+    btn.textContent = '合成中...';
+    btn.disabled = true;
+
+    try {
+      const mergeItems: MergeFileItem[] = [];
+      for (const q of pdfMergeQueue) {
+        const file = fileRecords.find(f => f.id === q.fileRecordId);
+        if (!file) continue;
+        const buf = await file.fileBody.arrayBuffer();
+        mergeItems.push({
+          name: file.filename,
+          type: file.fileType === 'application/pdf' ? 'pdf' : 'image',
+          data: buf,
+        });
+      }
+
+      const pdfBytes = await mergeFilesToPdf(mergeItems);
+      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+      const filenameInput = document.getElementById('pdfFilename') as HTMLInputElement;
+      const filename = (filenameInput.value.trim() || '合并文档') + '.pdf';
+      const uncId = await getUncategorizedId();
+      await addFileRecord({
+        filename,
+        fileType: 'application/pdf',
+        fileBody: pdfBlob,
+        fileSize: pdfBlob.size,
+        fileDescription: '',
+        categoryId: uncId ?? 0,
+        createdAt: Date.now(),
+      });
+      fileRecords = await getAllFileRecords();
+
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      pdfMergeQueue = [];
+      renderPdfPage();
+    } catch (err) {
+      console.error('PDF merge failed:', err);
+      alert('PDF 合成失败，请检查文件格式');
+      btn.textContent = '合成 PDF';
+      btn.disabled = false;
+    }
+  });
+}
+
+function showPdfFilePickerModal() {
+  const eligibleFiles = fileRecords.filter(f => PDF_ACCEPT_TYPES.has(f.fileType));
+  const itemsHtml = eligibleFiles.map(f => `
+    <label class="pdf-picker-item">
+      <input type="checkbox" class="pdf-picker-checkbox" data-file-id="${f.id}" />
+      <span class="pdf-picker-name">${escapeHtml(f.filename)}</span>
+      <span class="pdf-picker-type">${f.fileType === 'application/pdf' ? 'PDF' : '图片'}</span>
+    </label>
+  `).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'pdf-picker-overlay';
+  overlay.innerHTML = `
+    <div class="pdf-picker-modal">
+      <div class="pdf-picker-header">
+        <h3>选择文件</h3>
+        <button class="pdf-picker-close" id="pdfPickerClose">×</button>
+      </div>
+      <div class="pdf-picker-list">${itemsHtml}</div>
+      <div class="pdf-picker-footer">
+        <button class="pdf-btn-secondary" id="pdfPickerCancel">取消</button>
+        <button class="pdf-btn-primary" id="pdfPickerConfirm">确认添加</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.querySelector('#pdfPickerClose')?.addEventListener('click', close);
+  overlay.querySelector('#pdfPickerCancel')?.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  overlay.querySelector('#pdfPickerConfirm')?.addEventListener('click', () => {
+    const checked = overlay.querySelectorAll<HTMLInputElement>('.pdf-picker-checkbox:checked');
+    checked.forEach(cb => {
+      const fileId = Number(cb.dataset.fileId);
+      const file = fileRecords.find(f => f.id === fileId);
+      if (!file || pdfMergeQueue.some(q => q.fileRecordId === fileId)) return;
+      pdfMergeQueue.push({ fileRecordId: fileId, name: file.filename, type: file.fileType });
+    });
+    close();
+    renderPdfPage();
+  });
 }
 
 // ===== Profile Page =====
