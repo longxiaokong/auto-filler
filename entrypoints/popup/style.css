@@ -32,13 +32,8 @@ body {
 .logo-icon {
   width: 24px;
   height: 24px;
-  background: #257FFD;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 14px;
+  object-fit: contain;
 }
 
 .logo-text {

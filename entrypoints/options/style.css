@@ -42,14 +42,8 @@ body {
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: #257FFD;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  object-fit: contain;
 }
 
 .brand-text {
@@ -590,6 +584,23 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/* ===== API Key hint ===== */
+.api-key-hint {
+  display: block;
+  font-size: 12px;
+  color: #667085;
+  margin-top: 4px;
+}
+
+.api-key-hint a {
+  color: #257FFD;
+  text-decoration: none;
+}
+
+.api-key-hint a:hover {
+  text-decoration: underline;
 }
 
 .settings-actions {

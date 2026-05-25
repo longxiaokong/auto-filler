@@ -9,6 +9,7 @@ export interface FormFieldInfo {
   label: string;
   placeholder: string;
   ariaLabel: string;
+  context: string;
 }
 
 export interface MatchResult {
@@ -22,8 +23,8 @@ function buildPrompt(fields: FormFieldInfo[], textFields: { key: string; value: 
 
   const fieldList = fields
     .map((f) => {
-      const clues = [f.label, f.placeholder, f.ariaLabel, f.name, f.id].filter(Boolean);
-      return `  [${f.index}] type=${f.type}, clues=[${clues.join(', ')}]`;
+      const context = f.context || [f.label, f.placeholder, f.ariaLabel, f.name, f.id].filter(Boolean).join(', ');
+      return `  [${f.index}] type=${f.type}, context="${context}"`;
     })
     .join('\n');
 

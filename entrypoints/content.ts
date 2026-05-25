@@ -6,6 +6,7 @@ interface FormField {
   label: string;
   placeholder: string;
   ariaLabel: string;
+  context: string;
 }
 
 interface FieldResult {
@@ -53,6 +54,28 @@ function findLabel(el: HTMLElement): string {
   return '';
 }
 
+const EDITABLE_SELECTOR = 'input:not([type="hidden"]):not([type="submit"]):not([type="reset"]):not([type="button"]):not([type="image"]):not([type="file"]), select, textarea';
+
+function countEditables(el: HTMLElement): number {
+  return el.querySelectorAll(EDITABLE_SELECTOR).length;
+}
+
+// Walk up the DOM from an editable element. When the parent container
+// contains more than one editable item, we've reached the form section
+// boundary — return the previous (tightest single-field) container's text.
+function findContext(el: HTMLElement): string {
+  let node: HTMLElement | null = el;
+  while (node && node !== document.body) {
+    const parentEl: HTMLElement | null = node.parentElement;
+    if (!parentEl) break;
+    if (countEditables(parentEl) > 1) {
+      return node.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    }
+    node = parentEl;
+  }
+  return '';
+}
+
 function extractField(el: HTMLElement): FormField {
   const tag = el.tagName.toLowerCase();
   return {
@@ -63,6 +86,7 @@ function extractField(el: HTMLElement): FormField {
     label: findLabel(el),
     placeholder: el.getAttribute('placeholder') ?? '',
     ariaLabel: el.getAttribute('aria-label') ?? '',
+    context: findContext(el),
   };
 }
 

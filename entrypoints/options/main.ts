@@ -1,6 +1,7 @@
 import { getApiConfig, setApiConfig } from '../../utils/storage';
 import { getAllTextFields, saveAllTextFields } from '../../utils/db';
 import type { TextField } from '../../utils/db';
+import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
 const pageContent = document.getElementById('pageContent')!;
@@ -19,7 +20,7 @@ const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
 
 let currentPage = 'profile';
 let textFields: TextField[] = [];
-let apiConfigData: { baseUrl: string; apiKey: string; model: string } | null = null;
+let apiConfigData: { baseUrl: string; apiKey: string; model: string; providerId: string } | null = null;
 let nextFieldId = 0;
 
 // ===== Navigation =====
@@ -196,7 +197,7 @@ function renderProfilePage() {
 // ===== Settings Page =====
 function renderSettingsPage() {
   const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
-  const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '' };
+  const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '', providerId: '' };
 
   nextFieldId = 0;
   const fieldRowsHtml = textFields.map((f) => createFieldRowHtml(f.key, f.value)).join('');
@@ -212,16 +213,27 @@ function renderSettingsPage() {
       <div class="settings-section">
         <h2>API 配置</h2>
         <div class="form-group">
+          <label for="providerSelect">模型供应商</label>
+          <select id="providerSelect">
+            <option value="">自定义</option>
+            ${buildProviderOptions(api.providerId)}
+          </select>
+        </div>
+        <div class="form-group">
           <label for="baseUrl">Base URL</label>
           <input type="text" id="baseUrl" value="${escapeAttr(api.baseUrl)}" placeholder="https://api.openai.com/v1" />
         </div>
         <div class="form-group">
           <label for="apiKey">API Key</label>
           <input type="password" id="apiKey" value="${escapeAttr(api.apiKey)}" placeholder="请输入 API Key" />
+          <span class="api-key-hint" id="apiKeyHint"></span>
         </div>
         <div class="form-group">
-          <label for="model">模型名称</label>
-          <input type="text" id="model" value="${escapeAttr(api.model)}" placeholder="例如 gpt-4o-mini" />
+          <label for="modelSelect">模型</label>
+          <select id="modelSelect">
+            ${buildModelOptions(api.providerId, api.model)}
+          </select>
+          <input type="text" id="modelCustom" class="hidden" placeholder="输入自定义模型名称" />
         </div>
       </div>
 
@@ -239,7 +251,97 @@ function renderSettingsPage() {
     row.querySelector<HTMLInputElement>('.field-key')?.focus();
   });
 
+  document.getElementById('providerSelect')?.addEventListener('change', onProviderChange);
+  document.getElementById('modelSelect')?.addEventListener('change', onModelSelectChange);
+
   document.getElementById('saveBtn')?.addEventListener('click', saveSettings);
+}
+
+function buildProviderOptions(currentProviderId: string): string {
+  const categories = ['domestic', 'aggregator', 'third-party', 'research', 'local'] as const;
+  const categoryLabels: Record<string, string> = {
+    domestic: '国内厂商',
+    aggregator: '聚合平台',
+    'third-party': '第三方',
+    research: '研究机构',
+    local: '本地 / 自部署',
+  };
+
+  return categories
+    .map((cat) => {
+      const providers = PROVIDER_PRESETS.filter((p) => p.category === cat);
+      const options = providers
+        .map((p) => {
+          const sel = p.id === currentProviderId ? ' selected' : '';
+          return `<option value="${p.id}"${sel}>${p.name}</option>`;
+        })
+        .join('');
+      return `<optgroup label="${categoryLabels[cat]}">${options}</optgroup>`;
+    })
+    .join('');
+}
+
+function buildModelOptions(providerId: string, currentModel: string): string {
+  if (!providerId) {
+    const sel = currentModel ? '' : ' selected';
+    return `<option value=""${sel}>请先选择供应商</option>${currentModel ? `<option value="${escapeAttr(currentModel)}" selected>${escapeHtml(currentModel)} (当前)</option>` : ''}<option value="__custom__">自定义模型...</option>`;
+  }
+
+  const provider = getProviderById(providerId);
+  if (!provider || provider.models.length === 0) {
+    const sel = currentModel ? '' : ' selected';
+    return `<option value=""${sel}>自定义</option><option value="__custom__">自定义模型...</option>${currentModel ? `<option value="${escapeAttr(currentModel)}" selected>${escapeHtml(currentModel)} (当前)</option>` : ''}`;
+  }
+
+  const modelInList = provider.models.includes(currentModel);
+  const options = provider.models
+    .map((m) => {
+      const sel = m === currentModel ? ' selected' : '';
+      return `<option value="${m}"${sel}>${m}</option>`;
+    })
+    .join('');
+
+  const customOpt = currentModel && !modelInList
+    ? `<option value="${escapeAttr(currentModel)}" selected>${escapeHtml(currentModel)} (当前)</option>`
+    : '';
+
+  return `${options}${customOpt}<option value="__custom__">自定义模型...</option>`;
+}
+
+function onProviderChange() {
+  const select = document.getElementById('providerSelect') as HTMLSelectElement;
+  const providerId = select.value;
+  const provider = getProviderById(providerId);
+  const baseUrlInput = document.getElementById('baseUrl') as HTMLInputElement;
+  const modelSelect = document.getElementById('modelSelect') as HTMLSelectElement;
+  const modelCustom = document.getElementById('modelCustom') as HTMLInputElement;
+  const apiKeyHint = document.getElementById('apiKeyHint');
+
+  if (provider) {
+    baseUrlInput.value = provider.baseUrl;
+    if (provider.apiKeyUrl && apiKeyHint) {
+      apiKeyHint.innerHTML = `获取 Key: <a href="${escapeAttr(provider.apiKeyUrl)}" target="_blank">${escapeHtml(provider.apiKeyUrl)}</a>`;
+    } else if (apiKeyHint) {
+      apiKeyHint.textContent = '';
+    }
+  } else {
+    if (apiKeyHint) apiKeyHint.textContent = '';
+  }
+
+  modelSelect.innerHTML = buildModelOptions(providerId, '');
+  modelCustom.classList.add('hidden');
+  modelCustom.value = '';
+}
+
+function onModelSelectChange() {
+  const modelSelect = document.getElementById('modelSelect') as HTMLSelectElement;
+  const modelCustom = document.getElementById('modelCustom') as HTMLInputElement;
+  if (modelSelect.value === '__custom__') {
+    modelCustom.classList.remove('hidden');
+    modelCustom.focus();
+  } else {
+    modelCustom.classList.add('hidden');
+  }
 }
 
 function createFieldRowHtml(key: string, value: string): string {
@@ -282,16 +384,26 @@ async function saveSettings() {
   await setApiConfig({
     baseUrl: (document.getElementById('baseUrl') as HTMLInputElement).value.trim(),
     apiKey: (document.getElementById('apiKey') as HTMLInputElement).value.trim(),
-    model: (document.getElementById('model') as HTMLInputElement).value.trim(),
+    model: getModelValue(),
+    providerId: (document.getElementById('providerSelect') as HTMLSelectElement).value,
   });
 
   apiConfigData = {
     baseUrl: (document.getElementById('baseUrl') as HTMLInputElement).value.trim(),
     apiKey: (document.getElementById('apiKey') as HTMLInputElement).value.trim(),
-    model: (document.getElementById('model') as HTMLInputElement).value.trim(),
+    model: getModelValue(),
+    providerId: (document.getElementById('providerSelect') as HTMLSelectElement).value,
   };
 
   showStatus('已保存');
+}
+
+function getModelValue(): string {
+  const modelSelect = document.getElementById('modelSelect') as HTMLSelectElement;
+  if (modelSelect.value === '__custom__') {
+    return (document.getElementById('modelCustom') as HTMLInputElement).value.trim();
+  }
+  return modelSelect.value;
 }
 
 function showStatus(text: string) {
