@@ -1,5 +1,4 @@
-import { getProfile, setProfile, getApiConfig, setApiConfig, isProfileConfigured, isApiConfigured } from '../../utils/storage';
-import type { ProfileType, ProfileFields } from '../../utils/storage';
+import './style.css';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
 const pageContent = document.getElementById('pageContent')!;
@@ -17,8 +16,6 @@ const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
 };
 
 let currentPage = 'profile';
-let profileData: { profileType: ProfileType; fields: ProfileFields } | null = null;
-let apiConfigData: { baseUrl: string; apiKey: string; model: string } | null = null;
 
 // ===== Navigation =====
 navItems.forEach((item) => {
@@ -59,9 +56,30 @@ function renderPlaceholderPage(title: string) {
 }
 
 // ===== Profile Page =====
-function renderProfilePage() {
-  const fields: ProfileFields = profileData?.fields ?? { name: '', gender: '', idNumber: '', phone: '', email: '', address: '' };
-  const hasData = profileData && isProfileConfiguredSync(fields);
+interface ProfileFields {
+  name: string;
+  phone: string;
+  email: string;
+  school: string;
+  major: string;
+  gpa: string;
+  [key: string]: string;
+}
+
+async function loadProfile(): Promise<ProfileFields> {
+  // TODO: replace with actual IndexedDB / Extension messaging
+  return {
+    name: '张三',
+    phone: '138****8888',
+    email: 'zhangsan@example.edu.cn',
+    school: '某某大学',
+    major: '计算机科学与技术',
+    gpa: '3.8/4.0',
+  };
+}
+
+async function renderProfilePage() {
+  const fields = await loadProfile();
 
   const infoFields = [
     { key: 'name', label: '姓名', icon: '👤' },
@@ -73,7 +91,7 @@ function renderProfilePage() {
   ];
 
   const infoHtml = infoFields.map((f) => {
-    const val = (fields as unknown as Record<string, string>)[f.key];
+    const val = fields[f.key];
     const displayVal = val ? escapeHtml(val) : '<span class="empty">未填写</span>';
     return `
       <div class="profile-field">
@@ -190,22 +208,8 @@ function renderProfilePage() {
   });
 }
 
-function isProfileConfiguredSync(fields: ProfileFields): boolean {
-  return fields.name.length > 0;
-}
-
 // ===== Settings Page =====
-const SETTINGS_FIELD_IDS = [
-  'name', 'gender', 'idNumber', 'phone', 'email', 'address',
-  'school', 'major', 'studentId', 'degree', 'gpa', 'enrollmentYear',
-  'employeeId', 'department', 'position', 'rank',
-] as const;
-
 function renderSettingsPage() {
-  const fields = profileData?.fields ?? {} as ProfileFields;
-  const type = profileData?.profileType ?? 'general';
-  const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '' };
-
   pageContent.innerHTML = `
     <div class="settings-form">
       <div class="settings-section">
@@ -213,9 +217,9 @@ function renderSettingsPage() {
         <div class="form-group">
           <label>类型</label>
           <select id="profileType">
-            <option value="general" ${type === 'general' ? 'selected' : ''}>普通</option>
-            <option value="student" ${type === 'student' ? 'selected' : ''}>学生</option>
-            <option value="civil_servant" ${type === 'civil_servant' ? 'selected' : ''}>公务员</option>
+            <option value="general">普通</option>
+            <option value="student" selected>学生</option>
+            <option value="civil_servant">公务员</option>
           </select>
         </div>
       </div>
@@ -225,96 +229,72 @@ function renderSettingsPage() {
         <div class="form-row">
           <div class="form-group">
             <label for="name">姓名</label>
-            <input type="text" id="name" value="${escapeAttr(fields.name)}" placeholder="请输入姓名" />
+            <input type="text" id="name" value="张三" placeholder="请输入姓名" />
           </div>
           <div class="form-group">
             <label for="gender">性别</label>
             <select id="gender">
               <option value="">请选择</option>
-              <option value="男" ${fields.gender === '男' ? 'selected' : ''}>男</option>
-              <option value="女" ${fields.gender === '女' ? 'selected' : ''}>女</option>
+              <option value="男" selected>男</option>
+              <option value="女">女</option>
             </select>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label for="idNumber">身份证号</label>
-            <input type="text" id="idNumber" value="${escapeAttr(fields.idNumber)}" placeholder="请输入身份证号" />
+            <input type="text" id="idNumber" placeholder="请输入身份证号" />
           </div>
           <div class="form-group">
             <label for="phone">手机号</label>
-            <input type="text" id="phone" value="${escapeAttr(fields.phone)}" placeholder="请输入手机号" />
+            <input type="text" id="phone" value="138****8888" placeholder="请输入手机号" />
           </div>
         </div>
         <div class="form-group">
           <label for="email">邮箱</label>
-          <input type="email" id="email" value="${escapeAttr(fields.email)}" placeholder="请输入邮箱" />
+          <input type="email" id="email" value="zhangsan@example.edu.cn" placeholder="请输入邮箱" />
         </div>
         <div class="form-group">
           <label for="address">地址</label>
-          <input type="text" id="address" value="${escapeAttr(fields.address)}" placeholder="请输入地址" />
+          <input type="text" id="address" placeholder="请输入地址" />
         </div>
       </div>
 
-      <div id="studentFieldsSection" class="settings-section ${type !== 'student' ? 'hidden' : ''}">
+      <div class="settings-section">
         <h2>学生信息</h2>
         <div class="form-row">
           <div class="form-group">
             <label for="school">学校</label>
-            <input type="text" id="school" value="${escapeAttr(fields.school ?? '')}" placeholder="请输入学校" />
+            <input type="text" id="school" value="某某大学" placeholder="请输入学校" />
           </div>
           <div class="form-group">
             <label for="major">专业</label>
-            <input type="text" id="major" value="${escapeAttr(fields.major ?? '')}" placeholder="请输入专业" />
+            <input type="text" id="major" value="计算机科学与技术" placeholder="请输入专业" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label for="studentId">学号</label>
-            <input type="text" id="studentId" value="${escapeAttr(fields.studentId ?? '')}" placeholder="请输入学号" />
+            <input type="text" id="studentId" placeholder="请输入学号" />
           </div>
           <div class="form-group">
             <label for="degree">学历</label>
             <select id="degree">
               <option value="">请选择</option>
-              <option value="本科" ${fields.degree === '本科' ? 'selected' : ''}>本科</option>
-              <option value="硕士" ${fields.degree === '硕士' ? 'selected' : ''}>硕士</option>
-              <option value="博士" ${fields.degree === '博士' ? 'selected' : ''}>博士</option>
+              <option value="本科" selected>本科</option>
+              <option value="硕士">硕士</option>
+              <option value="博士">博士</option>
             </select>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label for="gpa">GPA</label>
-            <input type="text" id="gpa" value="${escapeAttr(fields.gpa ?? '')}" placeholder="请输入 GPA" />
+            <input type="text" id="gpa" value="3.8/4.0" placeholder="请输入 GPA" />
           </div>
           <div class="form-group">
             <label for="enrollmentYear">入学年份</label>
-            <input type="text" id="enrollmentYear" value="${escapeAttr(fields.enrollmentYear ?? '')}" placeholder="例如 2022" />
-          </div>
-        </div>
-      </div>
-
-      <div id="civilServantFieldsSection" class="settings-section ${type !== 'civil_servant' ? 'hidden' : ''}">
-        <h2>公务员信息</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="employeeId">工号</label>
-            <input type="text" id="employeeId" value="${escapeAttr(fields.employeeId ?? '')}" placeholder="请输入工号" />
-          </div>
-          <div class="form-group">
-            <label for="department">部门</label>
-            <input type="text" id="department" value="${escapeAttr(fields.department ?? '')}" placeholder="请输入部门" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="position">职务</label>
-            <input type="text" id="position" value="${escapeAttr(fields.position ?? '')}" placeholder="请输入职务" />
-          </div>
-          <div class="form-group">
-            <label for="rank">职级</label>
-            <input type="text" id="rank" value="${escapeAttr(fields.rank ?? '')}" placeholder="请输入职级" />
+            <input type="text" id="enrollmentYear" placeholder="例如 2022" />
           </div>
         </div>
       </div>
@@ -323,15 +303,15 @@ function renderSettingsPage() {
         <h2>API 配置</h2>
         <div class="form-group">
           <label for="baseUrl">Base URL</label>
-          <input type="text" id="baseUrl" value="${escapeAttr(api.baseUrl)}" placeholder="https://api.openai.com/v1" />
+          <input type="text" id="baseUrl" placeholder="https://api.openai.com/v1" />
         </div>
         <div class="form-group">
           <label for="apiKey">API Key</label>
-          <input type="password" id="apiKey" value="${escapeAttr(api.apiKey)}" placeholder="请输入 API Key" />
+          <input type="password" id="apiKey" placeholder="请输入 API Key" />
         </div>
         <div class="form-group">
           <label for="model">模型名称</label>
-          <input type="text" id="model" value="${escapeAttr(api.model)}" placeholder="例如 gpt-4o-mini" />
+          <input type="text" id="model" placeholder="例如 gpt-4o-mini" />
         </div>
       </div>
 
@@ -342,56 +322,12 @@ function renderSettingsPage() {
     </div>
   `;
 
-  const profileTypeEl = document.getElementById('profileType') as HTMLSelectElement;
-  profileTypeEl?.addEventListener('change', () => {
-    const t = profileTypeEl.value as ProfileType;
-    document.getElementById('studentFieldsSection')?.classList.toggle('hidden', t !== 'student');
-    document.getElementById('civilServantFieldsSection')?.classList.toggle('hidden', t !== 'civil_servant');
+  document.getElementById('saveBtn')?.addEventListener('click', () => {
+    const statusMsg = document.getElementById('statusMsg')!;
+    statusMsg.textContent = '已保存';
+    statusMsg.classList.add('show');
+    setTimeout(() => statusMsg.classList.remove('show'), 2000);
   });
-
-  document.getElementById('saveBtn')?.addEventListener('click', saveSettings);
-}
-
-function getEl(id: string): HTMLInputElement | HTMLSelectElement {
-  return document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
-}
-
-function readSettingsFields(): ProfileFields {
-  const fields: Record<string, string> = {};
-  for (const id of SETTINGS_FIELD_IDS) {
-    fields[id] = getEl(id)?.value.trim() ?? '';
-  }
-  return fields as unknown as ProfileFields;
-}
-
-async function saveSettings() {
-  const profileType = (document.getElementById('profileType') as HTMLSelectElement).value as ProfileType;
-  const fields = readSettingsFields();
-
-  await setProfile(profileType, fields);
-  await setApiConfig({
-    baseUrl: getEl('baseUrl').value.trim(),
-    apiKey: getEl('apiKey').value.trim(),
-    model: getEl('model').value.trim(),
-  });
-
-  // Refresh local cache
-  profileData = { profileType, fields };
-  apiConfigData = {
-    baseUrl: getEl('baseUrl').value.trim(),
-    apiKey: getEl('apiKey').value.trim(),
-    model: getEl('model').value.trim(),
-  };
-
-  showStatus('已保存');
-}
-
-function showStatus(text: string) {
-  const statusMsg = document.getElementById('statusMsg');
-  if (!statusMsg) return;
-  statusMsg.textContent = text;
-  statusMsg.classList.add('show');
-  setTimeout(() => statusMsg.classList.remove('show'), 2000);
 }
 
 // ===== Utils =====
@@ -402,26 +338,5 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-function escapeAttr(text: string): string {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 // ===== Init =====
-async function init() {
-  const [{ profileType, fields }, apiConfig] = await Promise.all([
-    getProfile(),
-    getApiConfig(),
-  ]);
-
-  profileData = { profileType, fields };
-  apiConfigData = apiConfig;
-
-  switchPage('profile');
-}
-
-init();
+switchPage('profile');

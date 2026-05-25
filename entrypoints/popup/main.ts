@@ -31,10 +31,20 @@ interface FillResponse {
   failure: number;
 }
 
+type ViewState = 'idle' | 'scanning' | 'result' | 'filling' | 'filled';
+
+interface DisplayItem {
+  index: number;
+  label: string;
+  value: string;
+  status: 'matched' | 'pending' | 'unmatched';
+  checked: boolean;
+}
+
 // State
-let matches: MatchResult[] = [];
+let viewState: ViewState = 'idle';
+let displayItems: DisplayItem[] = [];
 let fields: FormFieldInfo[] = [];
-let selectedIndices = new Set<number>();
 
 async function init() {
   const [profileReady, apiReady, { profileType }] = await Promise.all([
@@ -44,7 +54,13 @@ async function init() {
   ]);
 
   renderHeader(profileType);
-  renderMain(profileReady, apiReady);
+
+  if (!profileReady || !apiReady) {
+    renderNotConfigured(!profileReady);
+    return;
+  }
+
+  renderIdle();
 }
 
 function renderHeader(profileType: string) {
@@ -52,158 +68,348 @@ function renderHeader(profileType: string) {
   header.className = 'header';
   header.innerHTML = `
     <div class="header-left">
-      <span class="logo">⚡ Auto Filler</span>
+      <div class="logo-icon">AI</div>
+      <span class="logo-text">智能填表助手</span>
     </div>
     <div class="header-right">
-      <span class="badge">${PROFILE_TYPE_LABELS[profileType] || profileType}</span>
-      <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
+      <button class="avatar-btn" id="avatarBtn" title="工作台">${PROFILE_TYPE_LABELS[profileType]?.[0] || '用'}</button>
+      <button class="close-btn" id="closeBtn" title="关闭">&times;</button>
     </div>
   `;
   app.appendChild(header);
 
-  document.getElementById('settingsBtn')!.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
+  document.getElementById('avatarBtn')!.addEventListener('click', () => {
+    const extId = chrome.runtime.id;
+    window.open(`http://localhost:5173?extId=${extId}`);
+  });
+  document.getElementById('closeBtn')!.addEventListener('click', () => {
+    window.close();
   });
 }
 
-function renderMain(profileReady: boolean, apiReady: boolean) {
-  const main = document.createElement('div');
-  main.className = 'main';
-
-  if (!profileReady || !apiReady) {
-    main.innerHTML = `
-      <div class="not-configured">
-        <p>${!profileReady ? '请先在设置页录入个人信息' : '请先在设置页配置 API Key'}</p>
-        <span class="settings-link" id="goSettings">前往设置</span>
-      </div>
-    `;
+function getMainContainer(needFooter: boolean): HTMLElement {
+  let main = app.querySelector<HTMLElement>('.main');
+  if (!main) {
+    main = document.createElement('div');
+    main.className = 'main';
     app.appendChild(main);
-    document.getElementById('goSettings')!.addEventListener('click', () => {
-      chrome.runtime.openOptionsPage();
-    });
-    return;
   }
-
-  const btn = document.createElement('button');
-  btn.className = 'scan-btn';
-  btn.textContent = '🔍 扫描当前页面';
-  btn.addEventListener('click', startScan);
-  main.appendChild(btn);
-  app.appendChild(main);
+  main.className = needFooter ? 'main has-footer' : 'main no-footer';
+  main.innerHTML = '';
+  return main;
 }
 
-function startScan() {
-  const main = app.querySelector<HTMLElement>('.main')!;
+function renderNotConfigured(needProfile: boolean) {
+  const main = getMainContainer(false);
   main.innerHTML = `
-    <div class="loading">
-      <div class="spinner"></div>
-      <div class="loading-text">正在扫描并匹配字段...</div>
+    <div class="not-configured">
+      <div class="icon">⚙️</div>
+      <p>${needProfile ? '请先在设置页录入个人信息' : '请先在设置页配置 API Key'}</p>
+      <span class="settings-link" id="goSettings">前往设置</span>
     </div>
   `;
-
-  chrome.runtime.sendMessage({ type: 'startScan' }, (response: ScanResponse | ErrorResponse) => {
-    if (chrome.runtime.lastError) {
-      showError(main, '无法连接到页面，请刷新后重试');
-      return;
-    }
-    if (!response?.ok) {
-      showError(main, (response as ErrorResponse).error);
-      return;
-    }
-    const scanResp = response as ScanResponse;
-    matches = scanResp.matches;
-    fields = scanResp.fields;
-    selectedIndices = new Set(matches.map((m) => m.index));
-    renderResult(main, scanResp);
+  document.getElementById('goSettings')!.addEventListener('click', () => {
+    const extId = chrome.runtime.id;
+    window.open(`http://localhost:5173?extId=${extId}`);
   });
 }
 
-function showError(main: HTMLElement, message: string) {
+function renderIdle() {
+  viewState = 'idle';
+  removeFooter();
+  const main = getMainContainer(false);
   main.innerHTML = `
-    <div class="error">
-      <div class="error-text">${message}</div>
-      <button class="scan-btn" id="retryBtn">🔍 重新扫描</button>
+    <div class="scan-card">
+      <div class="scan-icon-wrap">🔍</div>
+      <div class="scan-title">扫描当前页面</div>
+      <div class="scan-desc">自动识别表单字段并匹配您的个人信息</div>
+      <button class="scan-btn" id="scanBtn">开始扫描</button>
     </div>
   `;
-  document.getElementById('retryBtn')!.addEventListener('click', startScan);
+  document.getElementById('scanBtn')!.addEventListener('click', startScan);
 }
 
-function renderResult(main: HTMLElement, scanResp: ScanResponse) {
-  if (scanResp.total === 0) {
-    main.innerHTML = `
-      <div class="empty-result">未检测到可填充的表单字段</div>
-    `;
-    return;
-  }
-
+function renderScanning() {
+  viewState = 'scanning';
+  removeFooter();
+  const main = getMainContainer(false);
   main.innerHTML = `
-    <div class="result-header">识别到 ${scanResp.total} 个表单字段（匹配 ${scanResp.matched} 个）</div>
-    <ul class="field-list" id="fieldList"></ul>
-    <button class="fill-btn" id="fillBtn">⚡ 确认一键填充</button>
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-text">正在识别表单字段...</div>
+    </div>
   `;
-
-  const list = document.getElementById('fieldList')!;
-
-  for (const match of matches) {
-    const li = document.createElement('li');
-    li.className = 'field-item';
-
-    const label = getFieldLabel(match.index);
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = true;
-    checkbox.addEventListener('change', () => {
-      if (checkbox.checked) selectedIndices.add(match.index);
-      else selectedIndices.delete(match.index);
-    });
-
-    li.appendChild(checkbox);
-    li.innerHTML += `
-      <span class="field-label">${label}</span>
-      <span class="field-arrow">→</span>
-      <span class="field-value">${match.value}</span>
-    `;
-    li.prepend(checkbox);
-    list.appendChild(li);
-  }
-
-  document.getElementById('fillBtn')!.addEventListener('click', startFill);
 }
 
-function getFieldLabel(index: number): string {
-  const field = fields.find((f) => f.index === index);
+function buildDisplayItems(scanResp: ScanResponse): DisplayItem[] {
+  const matchedSet = new Map<number, MatchResult>();
+  for (const m of scanResp.matches) {
+    matchedSet.set(m.index, m);
+  }
+
+  const items: DisplayItem[] = [];
+
+  // Matched items first
+  for (const m of scanResp.matches) {
+    const field = scanResp.fields.find((f) => f.index === m.index);
+    items.push({
+      index: m.index,
+      label: getFieldLabel(field, m.index),
+      value: m.value,
+      status: 'matched',
+      checked: true,
+    });
+  }
+
+  // Unmatched fields
+  for (const f of scanResp.fields) {
+    if (!matchedSet.has(f.index)) {
+      items.push({
+        index: f.index,
+        label: getFieldLabel(f, f.index),
+        value: '-',
+        status: 'unmatched',
+        checked: false,
+      });
+    }
+  }
+
+  return items;
+}
+
+function getFieldLabel(field: FormFieldInfo | undefined, index: number): string {
   if (!field) return `字段 #${index}`;
   return field.label || field.placeholder || field.name || field.ariaLabel || `字段 #${index}`;
 }
 
-function startFill() {
-  const selected = matches.filter((m) => selectedIndices.has(m.index));
-  if (selected.length === 0) return;
+function renderResult(scanResp: ScanResponse) {
+  viewState = 'result';
+  fields = scanResp.fields;
+  displayItems = buildDisplayItems(scanResp);
 
-  const main = app.querySelector<HTMLElement>('.main')!;
+  const pendingCount = displayItems.filter((i) => i.status === 'pending').length;
+  const matchedCount = displayItems.filter((i) => i.status === 'matched').length;
+
+  const main = getMainContainer(true);
+
+  if (scanResp.total === 0) {
+    main.innerHTML = `
+      <div class="result-msg">
+        <div class="icon empty">📭</div>
+        <div class="text">未检测到表单字段</div>
+        <div class="sub">当前页面无可填充的输入框</div>
+      </div>
+    `;
+    renderFooter(0);
+    return;
+  }
+
   main.innerHTML = `
-    <div class="loading">
-      <div class="spinner"></div>
-      <div class="loading-text">正在填充...</div>
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-value">${scanResp.total}</div>
+        <div class="stat-label">识别字段</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value matched">${matchedCount}</div>
+        <div class="stat-label">匹配成功</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value pending">${pendingCount}</div>
+        <div class="stat-label">待确认</div>
+      </div>
+    </div>
+    <div class="field-list-card">
+      <div class="field-list-header">
+        <span class="col-label">字段</span>
+        <span class="col-value">匹配内容</span>
+        <span class="col-status">状态</span>
+      </div>
+      <ul class="field-list" id="fieldList"></ul>
     </div>
   `;
 
-  const items = selected.map((m) => ({ index: m.index, value: m.value }));
+  const list = document.getElementById('fieldList')!;
+  for (const item of displayItems) {
+    const li = document.createElement('li');
+    li.className = 'field-item' + (item.status === 'pending' ? ' pending-row' : '');
 
-  chrome.runtime.sendMessage({ type: 'startFill', payload: { matches: items } }, (response: FillResponse | ErrorResponse) => {
-    if (!response?.ok) {
-      showError(main, (response as ErrorResponse).error);
+    const checkboxHtml = item.status !== 'unmatched'
+      ? `<input type="checkbox" data-idx="${item.index}" ${item.checked ? 'checked' : ''} />`
+      : `<input type="checkbox" data-idx="${item.index}" disabled />`;
+
+    const statusHtml =
+      item.status === 'matched'
+        ? '<span class="status-tag matched">已匹配</span>'
+        : item.status === 'pending'
+          ? '<span class="status-tag pending">需确认</span>'
+          : '<span class="status-tag unmatched">未匹配</span>';
+
+    li.innerHTML = `
+      ${checkboxHtml}
+      <span class="field-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</span>
+      <span class="field-value" title="${escapeHtml(item.value)}">${escapeHtml(item.value)}</span>
+      <span class="field-status">${statusHtml}</span>
+    `;
+    list.appendChild(li);
+  }
+
+  // Bind checkbox events
+  list.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:not([disabled])').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const idx = Number(cb.dataset.idx);
+      const item = displayItems.find((i) => i.index === idx);
+      if (item) item.checked = cb.checked;
+      updateFooterButton();
+    });
+  });
+
+  renderFooter(matchedCount);
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function removeFooter() {
+  const footer = app.querySelector<HTMLElement>('.footer');
+  if (footer) footer.remove();
+}
+
+function renderFooter(matchedCount: number) {
+  removeFooter();
+  const footer = document.createElement('div');
+  footer.className = 'footer';
+  footer.innerHTML = `
+    <button class="fill-btn" id="fillBtn">一键自动填充（${matchedCount} 项）</button>
+    <button class="secondary-btn" id="rescanBtn">重新扫描</button>
+  `;
+  app.appendChild(footer);
+
+  const fillBtn = document.getElementById('fillBtn') as HTMLButtonElement;
+  fillBtn.disabled = matchedCount === 0;
+  fillBtn.addEventListener('click', startFill);
+
+  document.getElementById('rescanBtn')!.addEventListener('click', startScan);
+}
+
+function updateFooterButton() {
+  const checkedCount = displayItems.filter((i) => i.checked && i.status !== 'unmatched').length;
+  const fillBtn = document.getElementById('fillBtn') as HTMLButtonElement | null;
+  if (fillBtn) {
+    fillBtn.textContent = `一键自动填充（${checkedCount} 项）`;
+    fillBtn.disabled = checkedCount === 0;
+  }
+}
+
+function startScan() {
+  renderScanning();
+
+  chrome.runtime.sendMessage({ type: 'startScan' }, (response: ScanResponse | ErrorResponse) => {
+    if (chrome.runtime.lastError) {
+      showError('无法连接到页面，请刷新后重试');
       return;
     }
-    const fillResp = response as FillResponse;
-    const cls = fillResp.failure === 0 ? 'success' : 'partial';
-    const text = fillResp.failure === 0
-      ? `填充完成！成功 ${fillResp.success} 个字段`
-      : `填充完成：成功 ${fillResp.success} 个，失败 ${fillResp.failure} 个`;
-    main.innerHTML = `
-      <div class="fill-result ${cls}">${text}</div>
-    `;
+    if (!response?.ok) {
+      showError((response as ErrorResponse).error);
+      return;
+    }
+    const scanResp = response as ScanResponse;
+    renderResult(scanResp);
   });
+}
+
+function showError(message: string) {
+  viewState = 'idle';
+  removeFooter();
+  const main = getMainContainer(false);
+  main.innerHTML = `
+    <div class="result-msg">
+      <div class="icon error">✕</div>
+      <div class="text">扫描失败</div>
+      <div class="sub">${escapeHtml(message)}</div>
+    </div>
+  `;
+
+  const btn = document.createElement('button');
+  btn.className = 'scan-btn';
+  btn.style.marginTop = '20px';
+  btn.style.maxWidth = '200px';
+  btn.textContent = '重新扫描';
+  btn.addEventListener('click', startScan);
+  main.querySelector('.result-msg')!.appendChild(btn);
+}
+
+function startFill() {
+  const selected = displayItems
+    .filter((i) => i.checked && i.status !== 'unmatched')
+    .map((i) => ({ index: i.index, value: i.value }));
+
+  if (selected.length === 0) return;
+
+  viewState = 'filling';
+  removeFooter();
+  const main = getMainContainer(false);
+  main.innerHTML = `
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-text">正在填充表单...</div>
+    </div>
+  `;
+
+  chrome.runtime.sendMessage(
+    { type: 'startFill', payload: { matches: selected } },
+    (response: FillResponse | ErrorResponse) => {
+      if (!response?.ok) {
+        renderFillResult(false, 0, 0, (response as ErrorResponse).error);
+        return;
+      }
+      const fillResp = response as FillResponse;
+      renderFillResult(fillResp.failure === 0, fillResp.success, fillResp.failure);
+    },
+  );
+}
+
+function renderFillResult(success: boolean, successCount: number, failureCount: number, errorMsg?: string) {
+  viewState = 'filled';
+  removeFooter();
+  const main = getMainContainer(false);
+
+  if (!success && errorMsg) {
+    main.innerHTML = `
+      <div class="result-msg">
+        <div class="icon error">✕</div>
+        <div class="text">填充失败</div>
+        <div class="sub">${escapeHtml(errorMsg)}</div>
+      </div>
+    `;
+  } else if (failureCount === 0) {
+    main.innerHTML = `
+      <div class="result-msg">
+        <div class="icon success">✓</div>
+        <div class="text">填充完成</div>
+        <div class="sub">成功填充 ${successCount} 个字段</div>
+      </div>
+    `;
+  } else {
+    main.innerHTML = `
+      <div class="result-msg">
+        <div class="icon success">✓</div>
+        <div class="text">填充完成</div>
+        <div class="sub">成功 ${successCount} 个，失败 ${failureCount} 个</div>
+      </div>
+    `;
+  }
+
+  const btn = document.createElement('button');
+  btn.className = 'scan-btn';
+  btn.style.marginTop = '20px';
+  btn.style.maxWidth = '200px';
+  btn.textContent = '关闭';
+  btn.addEventListener('click', () => window.close());
+  main.querySelector('.result-msg')!.appendChild(btn);
 }
 
 init();
