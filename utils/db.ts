@@ -4,6 +4,16 @@ export interface TextField {
   value: string;
 }
 
+export interface BlockItem {
+  fields: { key: string; value: string }[];
+}
+
+export interface BlockCategory {
+  id?: number;
+  title: string;
+  items: BlockItem[];
+}
+
 export interface FileRecord {
   id?: number;
   filename: string;
@@ -15,7 +25,7 @@ export interface FileRecord {
 }
 
 const DB_NAME = 'autoFillerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -29,6 +39,9 @@ function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore('fileRecords', { keyPath: 'id', autoIncrement: true });
         store.createIndex('fileType', 'fileType', { unique: false });
         store.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('blockCategories')) {
+        db.createObjectStore('blockCategories', { keyPath: 'id', autoIncrement: true });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -101,6 +114,44 @@ export async function deleteFileRecord(id: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('fileRecords', 'readwrite');
     const req = tx.objectStore('fileRecords').delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ── Block Categories ──
+
+export async function getAllBlockCategories(): Promise<BlockCategory[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('blockCategories', 'readonly');
+    const req = tx.objectStore('blockCategories').getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function saveBlockCategory(category: BlockCategory): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('blockCategories', 'readwrite');
+    const store = tx.objectStore('blockCategories');
+    let req: IDBRequest;
+    if (category.id != null) {
+      req = store.put(category);
+    } else {
+      req = store.add(category);
+    }
+    req.onsuccess = () => resolve(req.result as number);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteBlockCategory(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('blockCategories', 'readwrite');
+    const req = tx.objectStore('blockCategories').delete(id);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });

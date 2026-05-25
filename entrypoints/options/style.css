@@ -723,6 +723,204 @@ body {
   border-color: #FCA5A5;
 }
 
+/* ===== Block dynamic edit ===== */
+.exp-card-header {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.exp-card-key {
+  font-size: 11px;
+  color: #667085;
+  margin-bottom: 2px;
+}
+
+.exp-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.exp-card-actions button {
+  font-size: 12px;
+  color: #257FFD;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.exp-card-actions button:hover {
+  color: #1769E6;
+}
+
+.exp-card-actions .block-item-delete-btn {
+  color: #EF4444;
+}
+
+.exp-card-actions .block-item-delete-btn:hover {
+  color: #DC2626;
+}
+
+.exp-card-meta-item {
+  display: inline-block;
+}
+
+.block-empty {
+  font-size: 13px;
+  color: #9CA3AF;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.block-delete-btn {
+  font-size: 12px !important;
+  padding: 3px 10px !important;
+  border-color: #FCA5A5 !important;
+  color: #EF4444 !important;
+}
+
+.block-delete-btn:hover {
+  background: #FEF2F2 !important;
+}
+
+.add-block-cat-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed #257FFD;
+  border-radius: 14px;
+  background: #FAFCFF;
+  margin-bottom: 20px;
+}
+
+.add-block-cat-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #E5EAF2;
+  border-radius: 8px;
+  outline: none;
+  background: #FFFFFF;
+  color: #1F2937;
+}
+
+.add-block-cat-input:focus {
+  border-color: #257FFD;
+  box-shadow: 0 0 0 3px rgba(37, 127, 253, 0.1);
+}
+
+.add-block-cat-cancel {
+  font-size: 13px;
+  color: #667085;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 10px;
+}
+
+.add-block-cat-cancel:hover {
+  color: #1F2937;
+}
+
+.block-item-edit {
+  background: #FFFFFF !important;
+  border-color: #257FFD !important;
+}
+
+.block-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.block-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.block-field-row .block-field-key {
+  flex: 2;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid #E5EAF2;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #F9FAFB;
+  color: #1F2937;
+}
+
+.block-field-row .block-field-value {
+  flex: 3;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid #E5EAF2;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #F9FAFB;
+  color: #1F2937;
+}
+
+.block-field-row input:focus {
+  border-color: #257FFD;
+  box-shadow: 0 0 0 3px rgba(37, 127, 253, 0.1);
+}
+
+.block-field-row input::placeholder {
+  color: #9CA3AF;
+}
+
+.block-field-row .block-field-remove-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #E5EAF2;
+  background: #FFFFFF;
+  color: #EF4444;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.block-field-row .block-field-remove-btn:hover {
+  background: #FEF2F2;
+  border-color: #FCA5A5;
+}
+
+.block-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-block-cat-btn {
+  font-size: 15px;
+  padding: 12px;
+  border: 1px dashed #BBD7FF;
+  border-radius: 14px;
+  background: #FAFCFF;
+  width: 100%;
+  justify-content: center;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.add-block-cat-btn:hover {
+  background: #EAF2FF;
+  border-color: #257FFD;
+}
+
 /* ===== Scrollbar ===== */
 .page-content::-webkit-scrollbar {
   width: 6px;

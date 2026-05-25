@@ -1,6 +1,6 @@
 import { getApiConfig, setApiConfig } from '../../utils/storage';
-import { getAllTextFields, saveAllTextFields } from '../../utils/db';
-import type { TextField } from '../../utils/db';
+import { getAllTextFields, saveAllTextFields, getAllBlockCategories, saveBlockCategory, deleteBlockCategory } from '../../utils/db';
+import type { TextField, BlockCategory, BlockItem } from '../../utils/db';
 import { PROVIDER_PRESETS, getProviderById, type ProviderPreset } from '../../utils/providers';
 
 const navItems = document.querySelectorAll<HTMLElement>('.nav-item');
@@ -20,6 +20,7 @@ const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
 
 let currentPage = 'profile';
 let textFields: TextField[] = [];
+let blockCategories: BlockCategory[] = [];
 let apiConfigData: { baseUrl: string; apiKey: string; model: string; providerId: string } | null = null;
 let nextFieldId = 0;
 
@@ -85,38 +86,27 @@ function renderProfilePage() {
     `;
   }).join('');
 
-  // Mock experiences
-  const experiences = [
-    { name: '校园二手交易平台', time: '2024.03 - 2024.06', desc: '基于 Vue + Node.js 的全栈项目，支持商品发布、即时聊天与支付功能', type: '团队' },
-    { name: '智能简历分析系统', time: '2023.09 - 2023.12', desc: '使用 NLP 技术解析简历内容，自动提取关键信息并生成结构化报告', type: '个人' },
-  ];
-
-  const expHtml = experiences.map((e) => `
-    <div class="exp-card">
-      <div class="exp-card-header">
-        <span class="exp-card-title">${escapeHtml(e.name)}</span>
-        <span class="exp-tag">${e.type}</span>
+  // Block categories (dynamic from IndexedDB)
+  const blocksHtml = blockCategories.map((cat) => {
+    const catId = cat.id!;
+    const itemsHtml = cat.items.map((item, itemIdx) => renderBlockItemHtml(item, catId, itemIdx)).join('');
+    const emptyHtml = cat.items.length === 0 ? '<div class="block-empty">暂无内容，点击下方按钮添加</div>' : '';
+    return `
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">${escapeHtml(cat.title)}</span>
+          <button class="card-action block-delete-btn" data-cat-id="${catId}" title="删除此分类">删除分类</button>
+        </div>
+        <div class="exp-list">${itemsHtml}${emptyHtml}</div>
+        <button class="add-btn block-add-item-btn" data-cat-id="${catId}">+ 添加条目</button>
       </div>
-      <div class="exp-card-meta">${escapeHtml(e.time)}</div>
-      <div class="exp-card-desc">${escapeHtml(e.desc)}</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
-  // Mock awards
-  const awards = [
-    { name: '全国大学生数学建模竞赛 省级一等奖', time: '2024.10', org: '中国工业与应用数学学会' },
-    { name: 'ACM-ICPC 区域赛 银奖', time: '2023.11', org: 'ACM 协会' },
-  ];
-
-  const awardHtml = awards.map((a) => `
-    <div class="award-item">
-      <div class="award-icon">🏆</div>
-      <div class="award-info">
-        <div class="award-name">${escapeHtml(a.name)}</div>
-        <div class="award-meta">${escapeHtml(a.time)} · ${escapeHtml(a.org)}</div>
-      </div>
-    </div>
-  `).join('');
+  // Add block category button
+  const addBlockHtml = `
+    <button class="add-btn add-block-cat-btn" style="margin-bottom: 20px;">+ 添加分类</button>
+  `;
 
   // Mock materials
   const materials = [
@@ -157,21 +147,8 @@ function renderProfilePage() {
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">项目经历</span>
-          </div>
-          <div class="exp-list">${expHtml}</div>
-          <button class="add-btn">+ 添加项目</button>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">竞赛获奖</span>
-          </div>
-          <div>${awardHtml}</div>
-          <button class="add-btn">+ 添加奖项</button>
-        </div>
+        ${addBlockHtml}
+        ${blocksHtml}
       </div>
 
       <div class="profile-right">
@@ -191,6 +168,237 @@ function renderProfilePage() {
 
   document.getElementById('editProfileBtn')?.addEventListener('click', () => {
     switchPage('settings');
+  });
+
+  bindBlockEvents();
+}
+
+// ===== Block Item Rendering =====
+
+function renderBlockItemHtml(item: BlockItem, catId: number, itemIdx: number): string {
+  const first = item.fields[0];
+  const keyLabel = first ? escapeHtml(first.key) : '';
+  const valueDisplay = first ? escapeHtml(first.value) || '<span class="empty">未填写</span>' : '<span class="empty">未填写</span>';
+  const metaHtml = item.fields.slice(1).map(f =>
+    `<span class="exp-card-meta-item">${escapeHtml(f.key)}: ${escapeHtml(f.value)}</span>`
+  ).join('');
+
+  return `
+    <div class="exp-card" data-cat-id="${catId}" data-item-idx="${itemIdx}">
+      <div class="exp-card-header">
+        <div>
+          ${keyLabel ? `<div class="exp-card-key">${keyLabel}</div>` : ''}
+          <span class="exp-card-title">${valueDisplay}</span>
+        </div>
+        <div class="exp-card-actions">
+          <button class="block-item-edit-btn" data-cat-id="${catId}" data-item-idx="${itemIdx}">编辑</button>
+          <button class="block-item-delete-btn" data-cat-id="${catId}" data-item-idx="${itemIdx}">删除</button>
+        </div>
+      </div>
+      <div class="exp-card-meta">${metaHtml}</div>
+    </div>
+  `;
+}
+
+function renderBlockItemEditHtml(item: BlockItem, catId: number, itemIdx: number): string {
+  const rows = item.fields.length === 0
+    ? [{ key: '', value: '' }]
+    : item.fields;
+
+  const fieldRowsHtml = rows.map(f =>
+    `<div class="block-field-row">
+      <input type="text" class="block-field-key" placeholder="字段名" value="${escapeHtml(f.key)}" />
+      <input type="text" class="block-field-value" placeholder="字段值" value="${escapeHtml(f.value)}" />
+      <button class="btn-delete block-field-remove-btn" title="删除字段">&times;</button>
+    </div>`
+  ).join('');
+
+  return `
+    <div class="exp-card block-item-edit" data-cat-id="${catId}" data-item-idx="${itemIdx}">
+      <div class="block-edit-fields">${fieldRowsHtml}</div>
+      <div class="block-edit-actions">
+        <button class="add-btn block-add-field-btn">+ 添加字段</button>
+        <button class="card-action block-edit-save-btn">保存</button>
+        <button class="card-action block-edit-cancel-btn">取消</button>
+      </div>
+    </div>
+  `;
+}
+
+async function bindBlockEvents() {
+  // Add new block category — inline input
+  document.querySelector('.add-block-cat-btn')?.addEventListener('click', () => {
+    const btn = document.querySelector('.add-block-cat-btn')!;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'add-block-cat-form';
+    wrapper.innerHTML = `
+      <input type="text" class="add-block-cat-input" placeholder="输入分类名称，如：项目经历" />
+      <button class="card-action add-block-cat-confirm">添加</button>
+      <button class="add-block-cat-cancel">取消</button>
+    `;
+    btn.replaceWith(wrapper);
+    const input = wrapper.querySelector<HTMLInputElement>('.add-block-cat-input')!;
+    input.focus();
+
+    async function doAdd() {
+      const title = input.value.trim();
+      if (!title) { wrapper.replaceWith(btn); return; }
+      const cat: BlockCategory = { title, items: [] };
+      const id = await saveBlockCategory(cat);
+      cat.id = id;
+      blockCategories.push(cat);
+      renderProfilePage();
+    }
+
+    function doCancel() {
+      wrapper.replaceWith(btn);
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAdd();
+      if (e.key === 'Escape') doCancel();
+    });
+    wrapper.querySelector('.add-block-cat-confirm')!.addEventListener('click', doAdd);
+    wrapper.querySelector('.add-block-cat-cancel')!.addEventListener('click', doCancel);
+  });
+
+  // Delete block category — inline confirm
+  document.querySelectorAll<HTMLButtonElement>('.block-delete-btn').forEach(btn => {
+    let confirmTimer: ReturnType<typeof setTimeout> | null = null;
+
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.confirming === 'true') {
+        // Second click — actually delete
+        if (confirmTimer) clearTimeout(confirmTimer);
+        const catId = Number(btn.dataset.catId);
+        await deleteBlockCategory(catId);
+        blockCategories = blockCategories.filter(c => c.id !== catId);
+        renderProfilePage();
+        return;
+      }
+      // First click — enter confirm state
+      btn.dataset.confirming = 'true';
+      btn.textContent = '确认删除？';
+      confirmTimer = setTimeout(() => {
+        btn.dataset.confirming = '';
+        btn.textContent = '删除分类';
+      }, 3000);
+    });
+  });
+
+  // Add new item to a block category
+  document.querySelectorAll<HTMLButtonElement>('.block-add-item-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const catId = Number(btn.dataset.catId);
+      const cat = blockCategories.find(c => c.id === catId);
+      if (!cat) return;
+      const newItem: BlockItem = { fields: [{ key: '', value: '' }] };
+      cat.items.push(newItem);
+      renderProfilePage();
+      const editCards = document.querySelectorAll<HTMLElement>('.block-item-edit');
+      const last = editCards[editCards.length - 1];
+      last?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      last?.querySelector<HTMLInputElement>('.block-field-key')?.focus();
+    });
+  });
+
+  // Edit item
+  document.querySelectorAll<HTMLButtonElement>('.block-item-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const catId = Number(btn.dataset.catId);
+      const itemIdx = Number(btn.dataset.itemIdx);
+      const cat = blockCategories.find(c => c.id === catId);
+      if (!cat) return;
+      const item = cat.items[itemIdx];
+      const displayCard = btn.closest('.exp-card')!;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = renderBlockItemEditHtml(item, catId, itemIdx);
+      const editCard = tmp.firstElementChild as HTMLElement;
+      displayCard.replaceWith(editCard);
+      bindBlockItemEditEvents(editCard, catId, itemIdx);
+    });
+  });
+
+  // Delete item — inline confirm
+  document.querySelectorAll<HTMLButtonElement>('.block-item-delete-btn').forEach(btn => {
+    let confirmTimer: ReturnType<typeof setTimeout> | null = null;
+
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.confirming === 'true') {
+        if (confirmTimer) clearTimeout(confirmTimer);
+        const catId = Number(btn.dataset.catId);
+        const itemIdx = Number(btn.dataset.itemIdx);
+        const cat = blockCategories.find(c => c.id === catId);
+        if (!cat) return;
+        cat.items.splice(itemIdx, 1);
+        await saveBlockCategory(cat);
+        renderProfilePage();
+        return;
+      }
+      btn.dataset.confirming = 'true';
+      btn.textContent = '确认？';
+      confirmTimer = setTimeout(() => {
+        btn.dataset.confirming = '';
+        btn.textContent = '删除';
+      }, 3000);
+    });
+  });
+}
+
+function bindBlockItemEditEvents(editCard: HTMLElement, catId: number, itemIdx: number) {
+  // Add field row
+  editCard.querySelector('.block-add-field-btn')?.addEventListener('click', () => {
+    const fieldsContainer = editCard.querySelector('.block-edit-fields')!;
+    const row = document.createElement('div');
+    row.className = 'block-field-row';
+    row.innerHTML = `
+      <input type="text" class="block-field-key" placeholder="字段名" value="" />
+      <input type="text" class="block-field-value" placeholder="字段值" value="" />
+      <button class="btn-delete block-field-remove-btn" title="删除字段">&times;</button>
+    `;
+    fieldsContainer.appendChild(row);
+    row.querySelector<HTMLInputElement>('.block-field-key')?.focus();
+    row.querySelector('.block-field-remove-btn')?.addEventListener('click', () => row.remove());
+  });
+
+  // Remove field row
+  editCard.querySelectorAll('.block-field-remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.block-field-row')!;
+      const container = editCard.querySelector('.block-edit-fields')!;
+      if (container.children.length > 1) {
+        row.remove();
+      }
+    });
+  });
+
+  // Save
+  editCard.querySelector('.block-edit-save-btn')?.addEventListener('click', async () => {
+    const cat = blockCategories.find(c => c.id === catId);
+    if (!cat) return;
+    const rows = editCard.querySelectorAll<HTMLElement>('.block-field-row');
+    const fields: { key: string; value: string }[] = [];
+    rows.forEach(row => {
+      const key = (row.querySelector('.block-field-key') as HTMLInputElement)?.value.trim() ?? '';
+      const value = (row.querySelector('.block-field-value') as HTMLInputElement)?.value.trim() ?? '';
+      if (key || value) fields.push({ key, value });
+    });
+    cat.items[itemIdx] = { fields };
+    await saveBlockCategory(cat);
+    renderProfilePage();
+  });
+
+  // Cancel
+  editCard.querySelector('.block-edit-cancel-btn')?.addEventListener('click', () => {
+    const cat = blockCategories.find(c => c.id === catId);
+    if (!cat) return;
+    // If item has no meaningful fields, remove it
+    const item = cat.items[itemIdx];
+    const hasContent = item.fields.some(f => f.key.trim() || f.value.trim());
+    if (!hasContent) {
+      cat.items.splice(itemIdx, 1);
+    }
+    renderProfilePage();
   });
 }
 
@@ -433,13 +641,15 @@ function escapeAttr(text: string): string {
 
 // ===== Init =====
 async function init() {
-  const [fields, apiConfig] = await Promise.all([
+  const [fields, apiConfig, blocks] = await Promise.all([
     getAllTextFields(),
     getApiConfig(),
+    getAllBlockCategories(),
   ]);
 
   textFields = fields;
   apiConfigData = apiConfig;
+  blockCategories = blocks;
 
   switchPage('profile');
 }
