@@ -1,6 +1,12 @@
 # 秒填鸭
 
+[English](README.en.md) | 中文
+
 一款基于 LLM 语义匹配的 Chrome 表单自动填充扩展。支持文本字段填充和 PDF 证明材料按需合成，所有数据本地存储，无需注册账号。
+
+<div align="center">
+  <a href="../../releases/latest"><b>⬇️ 下载安装</b></a>
+</div>
 
 <div align="center">
   <img src="assets/1-popup.png" width="210" alt="Popup" />
@@ -35,33 +41,45 @@
 
 ## 安装
 
+### 从 Release 安装（推荐）
+
+前往 [Releases](../../releases) 下载对应压缩包：
+
+| 文件 | 适用浏览器 |
+|------|-----------|
+| `auto-filler-chrome.zip` | Chrome / Edge / Brave 等 Chromium 内核浏览器 |
+| `auto-filler-firefox.zip` | Firefox |
+
+**Chrome / Edge：**
+
+1. 打开 `chrome://extensions/`（Edge 为 `edge://extensions/`）
+2. 开启右上角「开发者模式」
+3. 将下载的 zip 文件**直接拖入页面**
+
+**Firefox：**
+
+1. 打开 `about:debugging#/runtime/this-firefox`
+2. 点击「加载临时附加组件」
+3. 选择下载的 zip 文件（Firefox 会将扩展标记为临时，重启后需重新加载）
+
 ### 从源码构建
 
 ```bash
-# 安装依赖
 npm install
-
-# 构建
-npm run build
-
-# 或构建 Firefox 版本
-npm run build:firefox
+npm run build            # Chrome
+npm run build:firefox    # Firefox
 ```
 
-### 加载到 Chrome
+构建产物在 `.output/` 目录，可在浏览器扩展管理页面以「加载已解压的扩展程序」方式加载。
 
-1. 打开 `chrome://extensions/`
-2. 开启右上角「开发者模式」
-3. 点击「加载已解压的扩展程序」
-4. 选择项目目录下的 `.output/chrome-mv3` 文件夹
-
-### 打包发布
+### 打包
 
 ```bash
-npm run zip
+npm run zip            # Chrome
+npm run zip:firefox    # Firefox
 ```
 
-产物在 `.output/` 目录，可直接上传 Chrome Web Store。
+产物在 `.output/` 目录，可直接上传到 Chrome Web Store 或 GitHub Releases。
 
 ## 使用方式
 
