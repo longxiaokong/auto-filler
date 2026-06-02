@@ -48,7 +48,12 @@ interface FillResult {
 
 interface ScanMessage { type: 'scan' }
 interface FillMessage { type: 'fill'; items: FillItem[] }
-type Message = ScanMessage | FillMessage;
+interface FillStreamInitMessage { type: 'fillStreamInit'; items: Array<{ index: number; fillMode: 'short' | 'long' }> }
+interface FillFieldMessage { type: 'fillField'; index: number; value: string }
+interface FillTypeChunkMessage { type: 'fillTypeChunk'; index: number; chunk: string }
+interface FillTypeCommitMessage { type: 'fillTypeCommit'; index: number }
+interface FillStreamCompleteMessage { type: 'fillStreamComplete' }
+type Message = ScanMessage | FillMessage | FillStreamInitMessage | FillFieldMessage | FillTypeChunkMessage | FillTypeCommitMessage | FillStreamCompleteMessage;
 
 let elementMap = new Map<number, HTMLElement>();
 
@@ -364,32 +369,73 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+function fillOneField(index: number, value: string): boolean {
+  const el = elementMap.get(index);
+  if (!el) return false;
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  try {
+    const tag = el.tagName.toLowerCase();
+    const type = (el as HTMLInputElement).type;
+
+    if (type === 'radio') {
+      const input = el as HTMLInputElement;
+      if (input.value === value) {
+        input.checked = true;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      return true;
+    }
+    if (type === 'checkbox') {
+      const input = el as HTMLInputElement;
+      input.checked = value === 'true' || value === '1' || value === input.value;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    if (tag === 'select') {
+      const select = el as HTMLSelectElement;
+      const option = Array.from(select.options).find(
+        (opt) => opt.value === value || opt.textContent?.trim() === value,
+      );
+      select.value = option ? option.value : value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    if (tag === 'textarea' || tag === 'input') {
+      const target = el as HTMLInputElement | HTMLTextAreaElement;
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (nativeSetter && tag === 'input') {
+        nativeSetter.call(target, value);
+      } else {
+        target.value = value;
+      }
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      target.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
+      el.textContent = value;
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function fillFields(items: FillItem[]): FillResult {
   let success = 0;
   let failure = 0;
 
   for (const item of items) {
-    const { index } = item;
-    const el = elementMap.get(index);
-    if (!el) {
-      failure++;
-      continue;
-    }
-
-    try {
-      const tag = el.tagName.toLowerCase();
-      const type = (el as HTMLInputElement).type;
-
-      if (item.kind === 'file') {
-        if (!(el instanceof HTMLInputElement) || el.type !== 'file') {
-          failure++;
-          continue;
-        }
-        if (!isAcceptedFileType(el.accept, item.fileName, item.fileType)) {
-          failure++;
-          continue;
-        }
-
+    if (item.kind === 'file') {
+      const el = elementMap.get(item.index);
+      if (!(el instanceof HTMLInputElement) || el.type !== 'file') { failure++; continue; }
+      if (!isAcceptedFileType(el.accept, item.fileName, item.fileType)) { failure++; continue; }
+      try {
         const file = new File([base64ToArrayBuffer(item.fileBody)], item.fileName, { type: item.fileType || 'application/octet-stream' });
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(file);
@@ -397,64 +443,99 @@ function fillFields(items: FillItem[]): FillResult {
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         success++;
-      } else if (type === 'radio') {
-        const { value } = item;
-        const input = el as HTMLInputElement;
-        if (input.value === value) {
-          input.checked = true;
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        success++;
-      } else if (type === 'checkbox') {
-        const { value } = item;
-        const input = el as HTMLInputElement;
-        input.checked = value === 'true' || value === '1' || value === input.value;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        success++;
-      } else if (tag === 'select') {
-        const { value } = item;
-        const select = el as HTMLSelectElement;
-        const option = Array.from(select.options).find(
-          (opt) => opt.value === value || opt.textContent?.trim() === value,
-        );
-        if (option) {
-          select.value = option.value;
-        } else {
-          select.value = value;
-        }
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-        success++;
-      } else if (tag === 'textarea' || tag === 'input') {
-        const { value } = item;
-        const target = el as HTMLInputElement | HTMLTextAreaElement;
-        // Use native setter to ensure React/Angular pick up the change
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          'value',
-        )?.set;
-        if (nativeInputValueSetter && tag === 'input') {
-          nativeInputValueSetter.call(target, value);
-        } else {
-          target.value = value;
-        }
-        target.dispatchEvent(new Event('input', { bubbles: true }));
-        target.dispatchEvent(new Event('change', { bubbles: true }));
-        success++;
-      } else if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
-        const { value } = item;
-        el.textContent = value;
-        el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        success++;
-      } else {
-        failure++;
-      }
-    } catch {
-      failure++;
+      } catch { failure++; }
+    } else {
+      fillOneField(item.index, item.value) ? success++ : failure++;
     }
   }
 
   return { success, failure };
+}
+
+// ─── Typing animation for streaming fill ────────────────────────────
+
+interface TypingEntry {
+  el: HTMLElement;
+  buffer: string;
+  pos: number;
+  timer: ReturnType<typeof setTimeout> | null;
+  tag: string;
+  isContentEditable: boolean;
+  scrolled: boolean;
+}
+
+const typingMap = new Map<number, TypingEntry>();
+
+function processTyping(index: number): void {
+  const entry = typingMap.get(index);
+  if (!entry) return;
+
+  if (!entry.scrolled) {
+    entry.scrolled = true;
+    entry.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  if (entry.pos >= entry.buffer.length) {
+    entry.timer = null;
+    return;
+  }
+
+  const ch = entry.buffer[entry.pos];
+  entry.pos++;
+
+  if (entry.tag === 'input' || entry.tag === 'textarea') {
+    const target = entry.el as HTMLInputElement | HTMLTextAreaElement;
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (nativeSetter && entry.tag === 'input') {
+      nativeSetter.call(target, target.value + ch);
+    } else {
+      target.value += ch;
+    }
+  } else if (entry.isContentEditable) {
+    entry.el.appendChild(document.createTextNode(ch));
+  }
+
+  entry.el.dispatchEvent(new Event('input', { bubbles: true }));
+
+  if (entry.pos < entry.buffer.length) {
+    entry.timer = setTimeout(() => processTyping(index), 30);
+  } else {
+    entry.timer = null;
+  }
+}
+
+function enqueueTyping(index: number, chunk: string): void {
+  const entry = typingMap.get(index);
+  if (!entry) return;
+  entry.buffer += chunk;
+  if (!entry.timer) {
+    entry.timer = setTimeout(() => processTyping(index), 0);
+  }
+}
+
+function commitTyping(index: number): void {
+  const entry = typingMap.get(index);
+  if (!entry) return;
+  // Fast-forward: type all remaining chars instantly
+  if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
+  while (entry.pos < entry.buffer.length) {
+    const ch = entry.buffer[entry.pos];
+    entry.pos++;
+    if (entry.tag === 'input' || entry.tag === 'textarea') {
+      const target = entry.el as HTMLInputElement | HTMLTextAreaElement;
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (nativeSetter && entry.tag === 'input') {
+        nativeSetter.call(target, target.value + ch);
+      } else {
+        target.value += ch;
+      }
+    } else if (entry.isContentEditable) {
+      entry.el.appendChild(document.createTextNode(ch));
+    }
+  }
+  entry.el.dispatchEvent(new Event('input', { bubbles: true }));
+  entry.el.dispatchEvent(new Event('change', { bubbles: true }));
+  typingMap.delete(index);
 }
 
 export default defineContentScript({
@@ -468,6 +549,44 @@ export default defineContentScript({
         } else if (message.type === 'fill') {
           const results = fillFields(message.items);
           sendResponse(results);
+        } else if (message.type === 'fillStreamInit') {
+          typingMap.clear();
+          for (const item of message.items) {
+            const el = elementMap.get(item.index);
+            if (!el) continue;
+            const tag = el.tagName.toLowerCase();
+            const isContentEditable = el.isContentEditable || el.getAttribute('role') === 'textbox';
+            if (item.fillMode === 'long') {
+              // Clear existing content for long text fields
+              if (tag === 'input' || tag === 'textarea') {
+                (el as HTMLInputElement | HTMLTextAreaElement).value = '';
+              } else if (isContentEditable) {
+                el.textContent = '';
+              }
+            }
+            typingMap.set(item.index, {
+              el,
+              buffer: '',
+              pos: 0,
+              timer: null,
+              tag,
+              isContentEditable,
+              scrolled: false,
+            });
+          }
+          sendResponse({ ok: true });
+        } else if (message.type === 'fillField') {
+          fillOneField(message.index, message.value);
+          sendResponse({ ok: true });
+        } else if (message.type === 'fillTypeChunk') {
+          enqueueTyping(message.index, message.chunk);
+          sendResponse({ ok: true });
+        } else if (message.type === 'fillTypeCommit') {
+          commitTyping(message.index);
+          sendResponse({ ok: true });
+        } else if (message.type === 'fillStreamComplete') {
+          typingMap.clear();
+          sendResponse({ ok: true });
         }
         // Return true to keep the message channel open for async sendResponse
         return true;

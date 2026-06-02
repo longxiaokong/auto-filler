@@ -26,7 +26,7 @@ interface FillResponse {
   failure: number;
 }
 
-type ViewState = 'idle' | 'scanning' | 'result' | 'filling' | 'filled';
+type ViewState = 'idle' | 'scanning' | 'result' | 'filling' | 'filled' | 'streaming';
 type Confidence = MatchResult['confidence'];
 
 interface DisplayItem {
@@ -127,9 +127,11 @@ function renderIdle() {
       <div class="scan-title">扫描当前页面</div>
       <div class="scan-desc">自动识别表单字段并匹配您的个人信息</div>
       <button class="scan-btn" id="scanBtn">开始扫描</button>
+      <button class="scan-btn stream-btn" id="streamScanBtn">流式自动填充</button>
     </div>
   `;
   document.getElementById('scanBtn')!.addEventListener('click', startScan);
+  document.getElementById('streamScanBtn')!.addEventListener('click', startStreamScan);
 }
 
 function renderScanning() {
@@ -445,6 +447,120 @@ function renderFillResult(success: boolean, successCount: number, failureCount: 
   btn.style.maxWidth = '200px';
   btn.textContent = '关闭';
   btn.addEventListener('click', () => window.close());
+  main.querySelector('.result-msg')!.appendChild(btn);
+}
+
+// ─── Streaming fill ─────────────────────────────────────────────────
+
+function startStreamScan() {
+  viewState = 'streaming';
+  renderStreamProgress();
+
+  const port = chrome.runtime.connect({ name: 'stream-fill' });
+
+  port.onMessage.addListener((msg) => {
+    if (msg.type === 'streamProgress') {
+      updateStreamProgress(msg.matched, msg.total, msg.latestLabel);
+    } else if (msg.type === 'streamComplete') {
+      renderStreamComplete(msg.matched, msg.errorCount);
+      port.disconnect();
+    } else if (msg.type === 'streamError') {
+      renderStreamError(msg.error);
+      port.disconnect();
+    }
+  });
+
+  port.onDisconnect.addListener(() => {
+    if (viewState === 'streaming') {
+      renderStreamError('连接已断开');
+    }
+  });
+
+  port.postMessage({ type: 'startStreamScan' });
+}
+
+function renderStreamProgress() {
+  removeFooter();
+  const main = getMainContainer(false);
+  main.innerHTML = `
+    <div class="stream-progress">
+      <div class="stream-header">
+        <div class="stream-spinner"></div>
+        <span class="stream-title">AI 正在识别并填充...</span>
+      </div>
+      <div class="stream-progress-bar-wrap">
+        <div class="stream-progress-bar">
+          <div class="stream-progress-fill" id="streamProgressFill" style="width:0%"></div>
+        </div>
+        <div class="stream-progress-text">
+          <span id="streamMatchedCount">0</span> / <span id="streamTotalCount">--</span>
+        </div>
+      </div>
+      <div class="stream-field-list" id="streamFieldList"></div>
+    </div>
+  `;
+}
+
+function updateStreamProgress(matched: number, total: number, latestLabel: string) {
+  const fill = document.getElementById('streamProgressFill');
+  const matchedEl = document.getElementById('streamMatchedCount');
+  const totalEl = document.getElementById('streamTotalCount');
+  const list = document.getElementById('streamFieldList');
+
+  if (fill) fill.style.width = `${total > 0 ? (matched / total) * 100 : 0}%`;
+  if (matchedEl) matchedEl.textContent = String(matched);
+  if (totalEl) totalEl.textContent = String(total);
+
+  if (list) {
+    const item = document.createElement('div');
+    item.className = 'stream-field-item done';
+    item.innerHTML = `
+      <span class="stream-dot filled"></span>
+      <span class="stream-field-label">${escapeHtml(latestLabel)}</span>
+      <span class="stream-field-status filled">已填充</span>
+    `;
+    list.appendChild(item);
+    list.scrollTop = list.scrollHeight;
+  }
+}
+
+function renderStreamComplete(matched: number, errorCount: number) {
+  viewState = 'filled';
+  removeFooter();
+  const main = getMainContainer(false);
+  main.innerHTML = `
+    <div class="result-msg">
+      <div class="icon success">✓</div>
+      <div class="text">流式填充完成</div>
+      <div class="sub">成功填充 ${matched} 个字段${errorCount > 0 ? `，${errorCount} 个失败` : ''}</div>
+    </div>
+  `;
+  const btn = document.createElement('button');
+  btn.className = 'scan-btn';
+  btn.style.marginTop = '20px';
+  btn.style.maxWidth = '200px';
+  btn.textContent = '关闭';
+  btn.addEventListener('click', () => window.close());
+  main.querySelector('.result-msg')!.appendChild(btn);
+}
+
+function renderStreamError(error: string) {
+  viewState = 'idle';
+  removeFooter();
+  const main = getMainContainer(false);
+  main.innerHTML = `
+    <div class="result-msg">
+      <div class="icon error">✕</div>
+      <div class="text">流式填充失败</div>
+      <div class="sub">${escapeHtml(error)}</div>
+    </div>
+  `;
+  const btn = document.createElement('button');
+  btn.className = 'scan-btn';
+  btn.style.marginTop = '20px';
+  btn.style.maxWidth = '200px';
+  btn.textContent = '重试';
+  btn.addEventListener('click', startStreamScan);
   main.querySelector('.result-msg')!.appendChild(btn);
 }
 
