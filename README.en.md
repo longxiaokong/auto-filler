@@ -125,6 +125,8 @@ npm run compile          # Type check only
 
 ## TODO
 
+- **Import/Export personal info**: Export personal info as JSON for backup and migration across devices
+- **Cloud sync**: Sync personal info and documents via WebDAV or similar protocols for multi-device access
 - **Auto-import personal info**: Scan form fields and automatically add unmatched fields to your personal info library
 - **Visual drag-and-drop upload**: Floating window or dialog for manually dragging documents into page file upload areas
 
