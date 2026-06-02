@@ -893,18 +893,6 @@ body {
   border-color: #257FFD;
 }
 
-.field-row-locked .field-key {
-  background: #F9FAFB;
-
-}
-
-.field-row-locked .field-key-label {
-  flex: 2;
-  font-size: 14px;
-  color: #667085;
-  padding: 9px 12px;
-}
-
 /* ===== Scrollbar ===== */
 .page-content::-webkit-scrollbar {
   width: 6px;

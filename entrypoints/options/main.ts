@@ -14,16 +14,40 @@ const pageContent = document.getElementById('pageContent')!;
 const pageTitle = document.getElementById('pageTitle')!;
 const pageSubtitle = document.getElementById('pageSubtitle')!;
 
-const DEFAULT_FIELDS: { key: string; label: string }[] = [
-  { key: 'name', label: '姓名' },
-  { key: 'phone', label: '手机号' },
-  { key: 'email', label: '邮箱' },
-  { key: 'address', label: '住址' },
+const PRESET_FIELDS: { key: string; label: string }[] = [
+  { key: '姓名', label: '姓名' },
+  { key: '手机号', label: '手机号' },
+  { key: '邮箱', label: '邮箱' },
+  { key: '住址', label: '住址' },
+  { key: '性别', label: '性别' },
+  { key: '民族', label: '民族' },
+  { key: '政治面貌', label: '政治面貌' },
+  { key: '出生地', label: '出生地' },
+  { key: '籍贯地', label: '籍贯地' },
+  { key: '户口所在地详细地址', label: '户口所在地详细地址' },
+  { key: '档案所在单位', label: '档案所在单位' },
+  { key: '档案所在单位地址', label: '档案所在单位地址' },
+  { key: '档案所在单位邮政编码', label: '档案所在单位邮政编码' },
+  { key: '通讯地址', label: '通讯地址' },
+  { key: '通信地址邮政编码', label: '通信地址邮政编码' },
+  { key: '婚否', label: '婚否' },
+  { key: '现役军人码', label: '现役军人码' },
+  { key: '身份证号码', label: '身份证号码' },
+  { key: '出生日期', label: '出生日期' },
+  { key: '紧急电话', label: '紧急电话' },
+  { key: '院系', label: '院系' },
+  { key: '学校', label: '学校' },
+  { key: '专业', label: '专业' },
+  { key: '预计毕业年月', label: '预计毕业年月' },
+  { key: '外语考试成绩', label: '外语考试成绩' },
+  { key: '英语六级成绩', label: '英语六级 / CET-6 成绩' },
+  { key: '综合排名', label: '综合排名' },
+  { key: '排名基数', label: '排名基数 / 年级总人数' },
+  { key: 'GPA', label: 'GPA' },
+  { key: '预计能否获得推免资格', label: '预计能否获得推免资格' },
+  { key: '学号', label: '学号' },
 ];
-const DEFAULT_FIELD_KEYS = new Set(DEFAULT_FIELDS.map((f) => f.key));
-const DEFAULT_FIELD_LABELS: Record<string, string> = Object.fromEntries(
-  DEFAULT_FIELDS.map((f) => [f.key, f.label]),
-);
+const PRESET_FIELD_KEYS = new Set(PRESET_FIELDS.map((f) => f.key));
 
 const PAGE_CONFIG: Record<string, { title: string; subtitle: string }> = {
   home: { title: '首页', subtitle: '概览与快捷入口' },
@@ -318,15 +342,13 @@ function showPdfFilePickerModal() {
 function renderProfilePage() {
   const fieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
 
-  const infoFields = DEFAULT_FIELDS.map((f) => ({ key: f.key, label: f.label }));
+  const infoFields = textFields.filter((f) => f.value);
 
   const infoHtml = infoFields.map((f) => {
-    const val = fieldMap[f.key] ?? '';
-    const displayVal = val ? escapeHtml(val) : '<span class="empty">未填写</span>';
     return `
       <div class="profile-field">
-        <span class="label">${f.label}</span>
-        <span class="value ${val ? '' : 'empty'}">${displayVal}</span>
+        <span class="label">${escapeHtml(f.key)}</span>
+        <span class="value">${escapeHtml(f.value)}</span>
       </div>
     `;
   }).join('');
@@ -1300,20 +1322,13 @@ function renderSettingsPage() {
   const api = apiConfigData ?? { baseUrl: '', apiKey: '', model: '', providerId: '' };
 
   nextFieldId = 0;
-  const settingsFieldMap = Object.fromEntries(textFields.map((f) => [f.key, f.value]));
-
-  const defaultFieldRows = DEFAULT_FIELDS.map((df) => {
-    return createFieldRowHtml(df.key, settingsFieldMap[df.key] ?? '', true);
-  }).join('');
-
-  const customFields = textFields.filter((f) => !DEFAULT_FIELD_KEYS.has(f.key));
-  const customFieldRows = customFields.map((f) => createFieldRowHtml(f.key, f.value, false)).join('');
+  const fieldRows = textFields.map((f) => createFieldRowHtml(f.key, f.value)).join('');
 
   pageContent.innerHTML = `
       <div class="settings-form">
         <div class="settings-section">
           <h2>个人信息</h2>
-        <ul class="profile-field-list" id="fieldList">${defaultFieldRows}${customFieldRows}</ul>
+        <ul class="profile-field-list" id="fieldList">${fieldRows}</ul>
         <button class="add-btn" id="addFieldBtn">+ 添加字段</button>
       </div>
 
@@ -1451,17 +1466,8 @@ function onModelSelectChange() {
   }
 }
 
-function createFieldRowHtml(key: string, value: string, locked = false): string {
+function createFieldRowHtml(key: string, value: string): string {
   const id = nextFieldId++;
-  if (locked) {
-    const label = DEFAULT_FIELD_LABELS[key] ?? key;
-    return `
-      <li class="field-row field-row-locked" data-id="${id}" data-key="${escapeAttr(key)}">
-        <span class="field-key-label">${escapeHtml(label)}</span>
-        <input type="text" class="field-value" placeholder="字段值" value="${escapeHtml(value)}" />
-      </li>
-    `;
-  }
   return `
     <li class="field-row" data-id="${id}">
       <input type="text" class="field-key" placeholder="字段名" value="${escapeHtml(key)}" />
@@ -1489,16 +1495,6 @@ async function saveSettings() {
   const rows = document.querySelectorAll<HTMLElement>('.field-row');
   const fields: { key: string; value: string }[] = [];
   const seenKeys = new Set<string>();
-
-  // Collect default fields first (locked rows with data-key)
-  for (const df of DEFAULT_FIELDS) {
-    const lockedRow = document.querySelector<HTMLElement>(`.field-row-locked[data-key="${df.key}"]`);
-    const fieldValue = lockedRow
-      ? ((lockedRow.querySelector('.field-value') as HTMLInputElement)?.value.trim() ?? '')
-      : '';
-    fields.push({ key: df.key, value: fieldValue });
-    seenKeys.add(df.key);
-  }
 
   rows.forEach((row) => {
     const key = (row.querySelector('.field-key') as HTMLInputElement)?.value.trim() ?? '';
@@ -1571,44 +1567,29 @@ async function init() {
     getAllCategories(),
     getAllFileRecords(),
   ]);
-  let fields = rawFields;
 
-  // Migrate old Chinese keys → new English keys
+  // Migrate old English keys → Chinese keys
   const KEY_MIGRATION: Record<string, string> = {
-    '姓名': 'name',
-    '手机号': 'phone',
-    '手机号码': 'phone',
-    '电话': 'phone',
-    '邮箱': 'email',
-    '电子邮件': 'email',
-    '地址': 'address',
-    '住址': 'address',
-    '家庭住址': 'address',
+    'name': '姓名',
+    'phone': '手机号',
+    'email': '邮箱',
+    'address': '住址',
   };
-  const mFieldMap = new Map<string, string>();
-  const migratedKeys = new Set<string>();
-  for (const f of fields) {
-    const targetKey = KEY_MIGRATION[f.key] ?? f.key;
-    if (!mFieldMap.has(targetKey) || (f.value && !mFieldMap.get(targetKey))) {
-      mFieldMap.set(targetKey, f.value);
-    }
-    if (KEY_MIGRATION[f.key]) migratedKeys.add(f.key);
-  }
+  const fields = rawFields.map((f) => ({
+    key: KEY_MIGRATION[f.key] ?? f.key,
+    value: f.value,
+  }));
 
-  if (migratedKeys.size > 0) {
-    fields = Array.from(mFieldMap, ([key, value]) => ({ key, value }));
-  }
-
-  // Seed default fields if missing
+  // Seed preset fields if missing
   const existingKeys = new Set(fields.map((f) => f.key));
   let needSave = false;
-  for (const df of DEFAULT_FIELDS) {
-    if (!existingKeys.has(df.key)) {
-      fields.push({ key: df.key, value: '' });
+  for (const pf of PRESET_FIELDS) {
+    if (!existingKeys.has(pf.key)) {
+      fields.push({ key: pf.key, value: '' });
       needSave = true;
     }
   }
-  if (needSave || migratedKeys.size > 0) {
+  if (needSave) {
     await saveAllTextFields(fields);
   }
 

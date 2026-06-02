@@ -295,46 +295,29 @@ export default defineBackground(() => {
 });
 
 async function seedDevData() {
-  const [textFields, apiReady] = await Promise.all([
+  const [textFields] = await Promise.all([
     getAllTextFields(),
     isApiConfigured(),
   ]);
 
   const devFields = [
-    { key: '姓名', value: '刘智杰' },
-    { key: '手机号', value: '13810131217' },
-    { key: '地址', value: '安徽省合肥市包河区金寨路96号' },
-    { key: '身份证号', value: '340111200502146016' },
-    { key: '出生日期', value: '20050214' },
-    { key: '民族', value: '汉族' },
-    { key: '性别', value: '男' },
-    { key: '婚否', value: '未婚' },
-    { key: '政治面貌', value: '共青团员' },
-    { key: '户籍地址', value: '安徽省合肥市包河区金寨路96号' },
-    { key: '邮箱', value: 'liuzhijie@example.com' },
+    { key: '姓名', value: '' },
+    { key: '手机号', value: '' },
+    { key: '住址', value: '' },
+    { key: '身份证号码', value: '' },
+    { key: '出生日期', value: '' },
+    { key: '民族', value: '' },
+    { key: '性别', value: '' },
+    { key: '婚否', value: '' },
+    { key: '政治面貌', value: '' },
+    { key: '户口所在地详细地址', value: '' },
+    { key: '邮箱', value: '' },
   ];
 
-  const keyAliases: Record<string, string[]> = {
-    姓名: ['name'],
-    手机号: ['phone'],
-    地址: ['address'],
-    邮箱: ['email'],
-  };
   const existingKeys = new Set(textFields.map((field) => field.key));
-  const missingFields = devFields.filter((field) => {
-    const aliases = keyAliases[field.key] ?? [];
-    return !existingKeys.has(field.key) && aliases.every((alias) => !existingKeys.has(alias));
-  });
+  const missingFields = devFields.filter((field) => !existingKeys.has(field.key));
   if (missingFields.length > 0) {
     await saveAllTextFields([...textFields, ...missingFields]);
-  }
-
-  if (!apiReady) {
-    await setApiConfig({
-      baseUrl: 'https://api.deepseek.com/v1',
-      apiKey: 'sk-87f5684509814e7393b0f523b286147d',
-      model: 'deepseek-chat',
-    });
   }
 }
 
