@@ -2,6 +2,12 @@
 
 一款基于 LLM 语义匹配的 Chrome 表单自动填充扩展。支持文本字段填充和 PDF 证明材料按需合成，所有数据本地存储，无需注册账号。
 
+<div align="center">
+  <img src="assets/1-popup.png" width="210" alt="Popup" />
+  <img src="assets/2-filling.png" width="210" alt="Filling" />
+  <img src="assets/3-page.png" width="210" alt="Result" />
+</div>
+
 ## 功能
 
 ### 智能表单填充
@@ -106,4 +112,4 @@ npm run compile          # 类型检查
 
 ## License
 
-Private
+Licensed under the [Apache License 2.0](LICENSE).
